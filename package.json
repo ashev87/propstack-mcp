@@ -2,18 +2,45 @@
   "name": "propstack-mcp-server",
   "version": "0.1.0",
   "type": "module",
+  "description": "MCP server for Propstack real estate CRM — connect AI assistants to your Propstack data",
   "main": "dist/index.js",
   "bin": {
     "propstack-mcp-server": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["mcp", "propstack", "crm"],
+  "keywords": [
+    "mcp",
+    "propstack",
+    "real-estate",
+    "crm",
+    "immobilien",
+    "makler",
+    "ai",
+    "claude",
+    "chatgpt"
+  ],
   "author": "",
   "license": "MIT",
-  "description": "MCP server for Propstack CRM",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/propstack-mcp-server.git"
+  },
+  "homepage": "https://github.com/your-org/propstack-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/propstack-mcp-server/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "zod": "^4.3.6"

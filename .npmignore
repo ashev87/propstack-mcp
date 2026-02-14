@@ -1,0 +1,8 @@
+src/
+tsconfig.json
+CLAUDE.md
+.env
+.env.example
+node_modules/
+*.tgz
+.claude/
