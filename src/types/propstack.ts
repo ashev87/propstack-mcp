@@ -37,7 +37,24 @@ export interface PropstackContactSource {
   name: string | null;
 }
 
+export interface PropstackActivityType {
+  id: number;
+  name: string | null;
+  /** Category: message, for_notes, for_reminders, for_events */
+  category: string | null;
+  decision_options?: unknown;
+  followup_activities?: unknown[];
+  next_property_status_id?: number | null;
+  next_client_status_id?: number | null;
+  next_deal_stage_id?: number | null;
+}
+
 export interface PropstackContactStatus {
+  id: number;
+  name: string | null;
+}
+
+export interface PropstackReservationReason {
   id: number;
   name: string | null;
 }
@@ -499,7 +516,9 @@ export interface PropstackDocument {
 
 export interface PropstackActivity {
   id: number;
-  type: string | null;
+  type?: string | null;
+  /** API field: activity type — event, reminder, note, message, etc. */
+  conversation_type?: string | null;
   title: string | null;
   body: string | null;
   broker_id: number | null;
@@ -514,6 +533,12 @@ export interface PropstackActivity {
 
   created_at: string | null;
   updated_at: string | null;
+
+  // Polymorphic source ids (activities aggregate from todos, appointments, notes, messages)
+  todo_id?: number | null;
+  appointment_id?: number | null;
+  note_id?: number | null;
+  message_id?: number | null;
 }
 
 // ── Event (Termin — calendar read view) ─────────────────────────────

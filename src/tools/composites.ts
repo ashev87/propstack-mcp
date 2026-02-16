@@ -11,21 +11,14 @@ import type {
   PropstackTask,
   PropstackPaginatedResponse,
 } from "../types/propstack.js";
-import { textResult, errorResult, fmt, formatError, stripUndefined } from "./helpers.js";
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function fmtPrice(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "none";
-  return value.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-}
+import { textResult, errorResult, fmt, fmtPrice, fmtArea, formatError, stripUndefined, unwrapNumber } from "./helpers.js";
 
 function daysBetween(from: string, to: Date): number {
   return Math.floor((to.getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function contactName(c: PropstackContact): string {
-  return c.name ?? ([c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown");
+  return fmt(c.name) !== "none" ? fmt(c.name) : ([fmt(c.first_name, ""), fmt(c.last_name, "")].filter(Boolean).join(" ") || "Unknown");
 }
 
 // ── Tool registration ────────────────────────────────────────────────
@@ -123,9 +116,8 @@ need the full picture: "Tell me everything about Herr Weber."`,
           personalLines.push("");
           personalLines.push("**Custom Fields:**");
           for (const [key, val] of Object.entries(contact.custom_fields)) {
-            if (val !== null && val !== undefined && val !== "") {
-              personalLines.push(`  ${key}: ${String(val)}`);
-            }
+            const s = fmt(val, "");
+            if (s) personalLines.push(`  ${key}: ${s}`);
           }
         }
 
@@ -279,7 +271,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
           `Type: ${fmt(property.marketing_type)} / ${fmt(property.rs_type)}`,
           property.price ? `Price: ${fmtPrice(property.price)}` : null,
           property.base_rent ? `Base rent: ${fmtPrice(property.base_rent)}` : null,
-          `Rooms: ${fmt(property.number_of_rooms)} | Space: ${property.living_space ? `${property.living_space} m²` : "none"}`,
+          `Rooms: ${fmt(property.number_of_rooms)} | Space: ${fmtArea(property.living_space)}`,
           `Status: ${fmt(property.property_status?.name)}`,
           `Broker: ${fmt(property.broker?.name, "unassigned")}`,
           dom !== null ? `Days on market: ${dom}` : null,
@@ -420,6 +412,17 @@ Filter by pipeline_id and/or broker_id. Use when asked:
     },
     async (args) => {
       try {
+        const pipelinesRes = await client.get<PropstackDealPipeline[]>("/deal_pipelines").then(
+          (v) => ({ status: "fulfilled" as const, value: v }),
+          (e) => ({ status: "rejected" as const, reason: e }),
+        );
+
+        if (pipelinesRes.status === "rejected") {
+          return errorResult("Pipeline summary", pipelinesRes.reason);
+        }
+
+        const pipelines = pipelinesRes.value;
+
         const dealParams: Record<string, string | number | boolean | undefined> = {
           include: "client,property",
           per_page: 100,
@@ -427,24 +430,30 @@ Filter by pipeline_id and/or broker_id. Use when asked:
         if (args.pipeline_id) dealParams["deal_pipeline_id"] = args.pipeline_id;
         if (args.broker_id) dealParams["broker_id"] = args.broker_id;
 
-        const [pipelinesRes, dealsRes] = await Promise.allSettled([
-          client.get<PropstackDealPipeline[]>("/deal_pipelines"),
-          client.get<PropstackPaginatedResponse<PropstackDeal>>(
-            "/client_properties",
-            { params: dealParams },
-          ),
-        ]);
+        const allDeals: PropstackDeal[] = [];
+        let page = 1;
+        let totalCount: number | undefined;
+        const maxDeals = 2000;
 
-        // Both are needed for a useful summary
-        if (pipelinesRes.status === "rejected" && dealsRes.status === "rejected") {
-          return errorResult("Pipeline summary", pipelinesRes.reason);
+        do {
+          const res = await client.get<PropstackPaginatedResponse<PropstackDeal>>(
+            "/client_properties",
+            { params: { ...dealParams, page } },
+          );
+          if (res.data?.length) allDeals.push(...res.data);
+          totalCount = res.meta?.total_count;
+          page++;
+        } while (
+          allDeals.length < (totalCount ?? 0) &&
+          allDeals.length < maxDeals
+        );
+
+        const warnings: string[] = [];
+        if (totalCount !== undefined && allDeals.length >= maxDeals && totalCount > maxDeals) {
+          warnings.push(`Summary capped at ${maxDeals} deals (${totalCount} total).`);
         }
 
-        const pipelines = pipelinesRes.status === "fulfilled" ? pipelinesRes.value : [];
-        const deals = dealsRes.status === "fulfilled" ? dealsRes.value : { data: [] as PropstackDeal[], meta: undefined };
-        const warnings: string[] = [];
-        if (pipelinesRes.status === "rejected") warnings.push(`Pipeline stages could not be loaded: ${formatError(pipelinesRes.reason)}`);
-        if (dealsRes.status === "rejected") warnings.push(`Deals could not be loaded: ${formatError(dealsRes.reason)}`);
+        const deals = { data: allDeals, meta: totalCount !== undefined ? { total_count: totalCount } : undefined };
 
         const dealList = deals.data ?? [];
         const now = new Date();
@@ -474,7 +483,7 @@ Filter by pipeline_id and/or broker_id. Use when asked:
           if (!stageStats[stageName]) stageStats[stageName] = { count: 0, value: 0, deals: [] };
           stageStats[stageName]!.count++;
 
-          const price = d.sold_price ?? d.property?.price ?? 0;
+          const price = unwrapNumber(d.sold_price) ?? unwrapNumber(d.property?.price) ?? 0;
           stageStats[stageName]!.value += price;
           totalValue += price;
           stageStats[stageName]!.deals.push(d);
@@ -750,13 +759,15 @@ Use when a new listing comes in to find potential buyers/renters:
 
 Logic:
 1. Fetches the property details (type, price, rooms, space, city, features)
-2. Fetches all active search profiles (paginates through all)
+2. Fetches active search profiles (paginates, capped by max_profiles)
 3. Scores each profile against the property on: marketing type, city,
    price range, room count, living space, property type, and features
 4. Returns top 20 matches sorted by score with match/mismatch details`,
     {
       property_id: z.number()
         .describe("Property ID to find matching contacts for"),
+      max_profiles: z.number().optional()
+        .describe("Max search profiles to fetch and score (default: 1000). Caps API calls and memory for large accounts."),
     },
     async (args) => {
       try {
@@ -765,19 +776,20 @@ Logic:
           `/units/${args.property_id}`,
         );
 
-        // Step 2: Get all search profiles (paginate)
+        // Step 2: Get search profiles (paginate, capped by max_profiles)
+        const maxProfiles = args.max_profiles ?? 1000;
         const allProfiles: PropstackSearchProfile[] = [];
         let page = 1;
         let hasMore = true;
-        while (hasMore) {
+        while (hasMore && allProfiles.length < maxProfiles) {
           const res = await client.get<PropstackPaginatedResponse<PropstackSearchProfile>>(
             "/saved_queries",
-            { params: { page, per_page: 100 } },
+            { params: { page, per_page: Math.min(100, maxProfiles - allProfiles.length) } },
           );
           if (res.data && res.data.length > 0) {
             allProfiles.push(...res.data);
             const total = res.meta?.total_count ?? 0;
-            hasMore = allProfiles.length < total;
+            hasMore = allProfiles.length < total && allProfiles.length < maxProfiles;
             page++;
           } else {
             hasMore = false;
@@ -820,22 +832,24 @@ Logic:
           }
 
           // City (weight: 3)
-          if (sp.cities?.length && property.city) {
+          const propCity = fmt(property.city, "");
+          if (sp.cities?.length && propCity) {
             maxScore += 3;
-            if (sp.cities.some((c) => property.city?.toLowerCase().includes(c.toLowerCase()))) {
+            if (sp.cities.some((c) => propCity.toLowerCase().includes(c.toLowerCase()))) {
               score += 3;
-              matches.push(`City: ${property.city}`);
+              matches.push(`City: ${propCity}`);
             } else {
-              mismatches.push(`City: wants ${sp.cities.join("/")}, property in ${property.city}`);
+              mismatches.push(`City: wants ${sp.cities.join("/")}, property in ${propCity}`);
             }
           }
 
           // Price range (weight: 2)
-          if ((sp.price !== null || sp.price_to !== null) && property.price !== null) {
+          const propPrice = unwrapNumber(property.price);
+          if ((sp.price !== null || sp.price_to !== null) && propPrice !== null) {
             maxScore += 2;
             const inRange =
-              (sp.price === null || sp.price === undefined || property.price! >= sp.price) &&
-              (sp.price_to === null || sp.price_to === undefined || property.price! <= sp.price_to);
+              (sp.price === null || sp.price === undefined || propPrice >= sp.price) &&
+              (sp.price_to === null || sp.price_to === undefined || propPrice <= sp.price_to);
             if (inRange) {
               score += 2;
               matches.push(`Price: ${fmtPrice(property.price)} in range`);
@@ -845,11 +859,12 @@ Logic:
           }
 
           // Rent range (weight: 2)
-          if ((sp.base_rent !== null || sp.base_rent_to !== null) && property.base_rent !== null) {
+          const propRent = unwrapNumber(property.base_rent);
+          if ((sp.base_rent !== null || sp.base_rent_to !== null) && propRent !== null) {
             maxScore += 2;
             const inRange =
-              (sp.base_rent === null || sp.base_rent === undefined || property.base_rent! >= sp.base_rent) &&
-              (sp.base_rent_to === null || sp.base_rent_to === undefined || property.base_rent! <= sp.base_rent_to);
+              (sp.base_rent === null || sp.base_rent === undefined || propRent >= sp.base_rent) &&
+              (sp.base_rent_to === null || sp.base_rent_to === undefined || propRent <= sp.base_rent_to);
             if (inRange) {
               score += 2;
               matches.push(`Rent: ${fmtPrice(property.base_rent)} in range`);
@@ -859,41 +874,44 @@ Logic:
           }
 
           // Rooms (weight: 2)
-          if ((sp.number_of_rooms !== null || sp.number_of_rooms_to !== null) && property.number_of_rooms !== null) {
+          const propRooms = unwrapNumber(property.number_of_rooms);
+          if ((sp.number_of_rooms !== null || sp.number_of_rooms_to !== null) && propRooms !== null) {
             maxScore += 2;
             const inRange =
-              (sp.number_of_rooms === null || sp.number_of_rooms === undefined || property.number_of_rooms! >= sp.number_of_rooms) &&
-              (sp.number_of_rooms_to === null || sp.number_of_rooms_to === undefined || property.number_of_rooms! <= sp.number_of_rooms_to);
+              (sp.number_of_rooms === null || sp.number_of_rooms === undefined || propRooms >= sp.number_of_rooms) &&
+              (sp.number_of_rooms_to === null || sp.number_of_rooms_to === undefined || propRooms <= sp.number_of_rooms_to);
             if (inRange) {
               score += 2;
-              matches.push(`Rooms: ${property.number_of_rooms}`);
+              matches.push(`Rooms: ${fmt(property.number_of_rooms)}`);
             } else {
-              mismatches.push(`Rooms: ${property.number_of_rooms} outside ${fmt(sp.number_of_rooms)}–${fmt(sp.number_of_rooms_to)}`);
+              mismatches.push(`Rooms: ${fmt(property.number_of_rooms)} outside ${fmt(sp.number_of_rooms)}–${fmt(sp.number_of_rooms_to)}`);
             }
           }
 
           // Living space (weight: 1)
-          if ((sp.living_space !== null || sp.living_space_to !== null) && property.living_space !== null) {
+          const propSpace = unwrapNumber(property.living_space);
+          if ((sp.living_space !== null || sp.living_space_to !== null) && propSpace !== null) {
             maxScore += 1;
             const inRange =
-              (sp.living_space === null || sp.living_space === undefined || property.living_space! >= sp.living_space) &&
-              (sp.living_space_to === null || sp.living_space_to === undefined || property.living_space! <= sp.living_space_to);
+              (sp.living_space === null || sp.living_space === undefined || propSpace >= sp.living_space) &&
+              (sp.living_space_to === null || sp.living_space_to === undefined || propSpace <= sp.living_space_to);
             if (inRange) {
               score += 1;
-              matches.push(`Space: ${property.living_space} m²`);
+              matches.push(`Space: ${fmtArea(property.living_space)}`);
             } else {
-              mismatches.push(`Space: ${property.living_space} m² outside ${fmt(sp.living_space)}–${fmt(sp.living_space_to)} m²`);
+              mismatches.push(`Space: ${fmtArea(property.living_space)} outside ${fmt(sp.living_space)}–${fmt(sp.living_space_to)} m²`);
             }
           }
 
           // Property type (weight: 2)
-          if (sp.rs_types?.length && property.rs_type) {
+          const propRsType = fmt(property.rs_type, "");
+          if (sp.rs_types?.length && propRsType) {
             maxScore += 2;
-            if (sp.rs_types.includes(property.rs_type)) {
+            if (sp.rs_types.includes(propRsType)) {
               score += 2;
-              matches.push(`Property type: ${property.rs_type}`);
+              matches.push(`Property type: ${propRsType}`);
             } else {
-              mismatches.push(`Property type: wants ${sp.rs_types.join("/")}, is ${property.rs_type}`);
+              mismatches.push(`Property type: wants ${sp.rs_types.join("/")}, is ${propRsType}`);
             }
           }
 
@@ -919,14 +937,14 @@ Logic:
           return textResult(
             `No matching search profiles found for property "${fmt(property.title, "Untitled")}" ` +
             `(${fmt(property.marketing_type)} ${fmt(property.rs_type)}, ${fmtPrice(property.price)}, ` +
-            `${fmt(property.number_of_rooms)} rooms, ${property.city ?? "?"}).\n\n` +
+            `${fmt(property.number_of_rooms)} rooms, ${fmt(property.city, "?")}).\n\n` +
             `Checked ${allProfiles.length} search profiles.`,
           );
         }
 
         const header = [
           `# Matching Contacts for: ${fmt(property.title, "Untitled")} (ID: ${property.id})`,
-          `${fmt(property.marketing_type)} ${fmt(property.rs_type)} — ${fmtPrice(property.price)} — ${fmt(property.number_of_rooms)} rooms — ${property.city ?? "?"}`,
+          `${fmt(property.marketing_type)} ${fmt(property.rs_type)} — ${fmtPrice(property.price)} — ${fmt(property.number_of_rooms)} rooms — ${fmt(property.city, "?")}`,
           "",
           `Found **${results.length}** matching profiles out of ${allProfiles.length} total (showing top ${top.length}):`,
           "",

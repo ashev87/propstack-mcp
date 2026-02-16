@@ -6,16 +6,27 @@ import { textResult, errorResult, fmt } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
+/** Resolve activity type — Propstack API uses conversation_type (event, reminder, note, message, etc). */
+function getActivityType(a: PropstackActivity): string {
+  const t = fmt(a.conversation_type ?? a.type, "");
+  if (t && t !== "none") return t;
+  const rec = a as unknown as Record<string, unknown>;
+  const uid = String(rec.unique_id ?? "");
+  if (uid.startsWith("event-")) return "event";
+  if (uid.startsWith("reminder-")) return "reminder";
+  return "—";
+}
+
 function formatActivity(a: PropstackActivity): string {
   const lines: (string | null)[] = [
     `**${fmt(a.title, "Untitled")}** (ID: ${a.id})`,
-    `Type: ${fmt(a.type)}`,
-    a.body ? `Body: ${a.body}` : null,
-    a.broker ? `Broker: ${a.broker.name}` : (a.broker_id ? `Broker ID: ${a.broker_id}` : null),
+    `Type: ${getActivityType(a)}`,
+    fmt(a.body, "") ? `Body: ${fmt(a.body)}` : null,
+    a.broker ? `Broker: ${fmt(a.broker.name)}` : (a.broker_id ? `Broker ID: ${a.broker_id}` : null),
   ];
 
   if (a.client) {
-    const name = a.client.name ?? [a.client.first_name, a.client.last_name].filter(Boolean).join(" ");
+    const name = fmt(a.client.name) !== "none" ? fmt(a.client.name) : [fmt(a.client.first_name, ""), fmt(a.client.last_name, "")].filter(Boolean).join(" ") || "Unnamed";
     lines.push(`Contact: ${name} (ID: ${a.client.id})`);
   } else if (a.client_id) {
     lines.push(`Contact ID: ${a.client_id}`);
@@ -39,7 +50,7 @@ function formatEvent(e: PropstackEvent): string {
     `Starts: ${fmt(e.starts_at)}`,
     `Ends: ${fmt(e.ends_at)}`,
     `State: ${fmt(e.state)}`,
-    e.location ? `Location: ${e.location}` : null,
+    fmt(e.location, "") ? `Location: ${fmt(e.location)}` : null,
     e.all_day ? `All day: yes` : null,
     e.private ? `Private: yes` : null,
     e.recurring ? `Recurring: yes (${fmt(e.rrule)})` : null,
@@ -47,7 +58,7 @@ function formatEvent(e: PropstackEvent): string {
   ];
 
   if (e.client) {
-    const name = e.client.name ?? [e.client.first_name, e.client.last_name].filter(Boolean).join(" ");
+    const name = fmt(e.client.name) !== "none" ? fmt(e.client.name) : [fmt(e.client.first_name, ""), fmt(e.client.last_name, "")].filter(Boolean).join(" ") || "Unnamed";
     lines.push(`Contact: ${name} (ID: ${e.client.id})`);
   }
 
@@ -55,7 +66,7 @@ function formatEvent(e: PropstackEvent): string {
     lines.push(`Property: ${fmt(e.property.title, "Untitled")} (ID: ${e.property.id})`);
   }
 
-  if (e.body) lines.push(`Notes: ${e.body}`);
+  if (fmt(e.body, "")) lines.push(`Notes: ${fmt(e.body)}`);
 
   return lines.filter(Boolean).join("\n");
 }
@@ -89,7 +100,9 @@ Activity types:
 - cancelation: Deal cancellations (Absagen)
 - decision: Deal decisions
 - sms: SMS messages
-- letter: Letters (Briefe)`,
+- letter: Letters (Briefe)
+
+Use list_activity_types to see all valid types for this account.`,
     {
       type: z.enum(["message", "note", "reminder", "event", "policy", "cancelation", "decision", "sms", "letter"]).optional()
         .describe("Filter by activity type"),

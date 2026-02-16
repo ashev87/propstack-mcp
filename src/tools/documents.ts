@@ -15,7 +15,7 @@ function formatDocument(d: PropstackDocument): string {
 
   const lines: (string | null)[] = [
     `**${fmt(d.title ?? d.name, "Untitled")}** (ID: ${d.id})`,
-    d.url ? `URL: ${d.url}` : null,
+    fmt(d.url, "") ? `URL: ${fmt(d.url)}` : null,
     flags.length ? `Flags: ${flags.join(", ")}` : null,
     d.tags?.length ? `Tags: ${d.tags.join(", ")}` : null,
     d.broker_id ? `Broker ID: ${d.broker_id}` : null,

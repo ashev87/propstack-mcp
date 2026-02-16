@@ -2,32 +2,23 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackProperty, PropstackPropertyStatus, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, fmtArea, stripUndefined } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
-
-function fmtPrice(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "none";
-  return value.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-}
-
-function fmtArea(value: number | null | undefined, unit = "m²"): string {
-  if (value === null || value === undefined) return "none";
-  return `${value} ${unit}`;
-}
 
 function formatProperty(p: PropstackProperty): string {
   const title = fmt(p.title, "Untitled");
   const marketingType = fmt(p.marketing_type);
   const rsType = fmt(p.rs_type);
+  const rsCategory = fmt(p.rs_category, "");
 
-  const address = [p.street, p.house_number].filter(Boolean).join(" ");
-  const cityLine = [p.zip_code, p.city].filter(Boolean).join(" ");
-  const fullAddress = [address, cityLine, p.country].filter(Boolean).join(", ");
+  const address = [fmt(p.street, ""), fmt(p.house_number, "")].filter(Boolean).join(" ");
+  const cityLine = [fmt(p.zip_code, ""), fmt(p.city, "")].filter(Boolean).join(" ");
+  const fullAddress = [address, cityLine, fmt(p.country, "")].filter(Boolean).join(", ");
 
   const lines: (string | null)[] = [
     `**${title}** (ID: ${p.id})`,
-    `Type: ${marketingType} / ${rsType}${p.rs_category ? ` / ${p.rs_category}` : ""}`,
+    `Type: ${marketingType} / ${rsType}${rsCategory ? ` / ${rsCategory}` : ""}`,
     `Address: ${fullAddress || "none"}`,
     marketingType === "BUY" || p.price ? `Price: ${fmtPrice(p.price)}` : null,
     marketingType === "RENT" || p.base_rent ? `Base rent: ${fmtPrice(p.base_rent)}` : null,
@@ -35,10 +26,10 @@ function formatProperty(p: PropstackProperty): string {
     `Living space: ${fmtArea(p.living_space)}`,
     p.plot_area ? `Plot area: ${fmtArea(p.plot_area)}` : null,
     `Rooms: ${fmt(p.number_of_rooms)}`,
-    p.number_of_bed_rooms ? `Bedrooms: ${p.number_of_bed_rooms}` : null,
-    p.number_of_bath_rooms ? `Bathrooms: ${p.number_of_bath_rooms}` : null,
-    p.floor !== undefined && p.floor !== null ? `Floor: ${p.floor}` : null,
-    p.construction_year ? `Built: ${p.construction_year}` : null,
+    p.number_of_bed_rooms ? `Bedrooms: ${fmt(p.number_of_bed_rooms)}` : null,
+    p.number_of_bath_rooms ? `Bathrooms: ${fmt(p.number_of_bath_rooms)}` : null,
+    p.floor !== undefined && p.floor !== null ? `Floor: ${fmt(p.floor)}` : null,
+    p.construction_year ? `Built: ${fmt(p.construction_year)}` : null,
     `Status: ${fmt(p.property_status?.name)}`,
     `Broker: ${fmt(p.broker?.name, "unassigned")}`,
     p.project ? `Project: ${fmt(p.project.name)}` : null,
@@ -48,18 +39,18 @@ function formatProperty(p: PropstackProperty): string {
 }
 
 function formatPropertyRow(p: PropstackProperty): string {
-  const addr = [p.street, p.house_number].filter(Boolean).join(" ");
-  const city = [p.zip_code, p.city].filter(Boolean).join(" ");
+  const addr = [fmt(p.street, ""), fmt(p.house_number, "")].filter(Boolean).join(" ");
+  const city = [fmt(p.zip_code, ""), fmt(p.city, "")].filter(Boolean).join(" ");
   const location = [addr, city].filter(Boolean).join(", ") || "—";
-  const price = p.price
-    ? p.price.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
-    : p.base_rent
-      ? p.base_rent.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) + "/mo"
+  const price = fmtPrice(p.price) !== "none"
+    ? fmtPrice(p.price)
+    : fmtPrice(p.base_rent) !== "none"
+      ? fmtPrice(p.base_rent) + "/mo"
       : "—";
-  const size = p.living_space ? `${p.living_space} m²` : "—";
-  const rooms = p.number_of_rooms != null ? `${p.number_of_rooms}R` : "—";
-  const status = p.property_status?.name ?? "—";
-  const type = [p.marketing_type, p.rs_type].filter(Boolean).join("/");
+  const size = fmtArea(p.living_space) !== "none" ? fmtArea(p.living_space) : "—";
+  const rooms = fmt(p.number_of_rooms) !== "none" ? `${fmt(p.number_of_rooms)}R` : "—";
+  const status = fmt(p.property_status?.name, "—");
+  const type = [fmt(p.marketing_type, ""), fmt(p.rs_type, "")].filter(Boolean).join("/");
 
   return `| ${p.id} | ${fmt(p.title, "—")} | ${type} | ${location} | ${price} | ${size} | ${rooms} | ${status} |`;
 }
@@ -239,12 +230,16 @@ Always fetches with new=1 (extra fields) and expand=1 (custom fields).`,
 
         let result = formatProperty(property);
 
-        // Append description texts if present
+        // Append description texts if present (unwrap nested {value} from new=1 API)
         const descriptions: string[] = [];
-        if (property.description_note) descriptions.push(`**Description:** ${property.description_note}`);
-        if (property.location_note) descriptions.push(`**Location:** ${property.location_note}`);
-        if (property.furnishing_note) descriptions.push(`**Furnishing:** ${property.furnishing_note}`);
-        if (property.other_note) descriptions.push(`**Other:** ${property.other_note}`);
+        const desc = fmt(property.description_note, "");
+        if (desc) descriptions.push(`**Description:** ${desc}`);
+        const loc = fmt(property.location_note, "");
+        if (loc) descriptions.push(`**Location:** ${loc}`);
+        const furn = fmt(property.furnishing_note, "");
+        if (furn) descriptions.push(`**Furnishing:** ${furn}`);
+        const other = fmt(property.other_note, "");
+        if (other) descriptions.push(`**Other:** ${other}`);
         if (descriptions.length > 0) {
           result += "\n\n" + descriptions.join("\n\n");
         }
@@ -270,8 +265,9 @@ Always fetches with new=1 (extra fields) and expand=1 (custom fields).`,
         // Append custom fields summary
         if (property.custom_fields && Object.keys(property.custom_fields).length > 0) {
           const cfEntries = Object.entries(property.custom_fields)
-            .filter(([, v]) => v !== null && v !== undefined && v !== "")
-            .map(([k, v]) => `  - ${k}: ${v}`);
+            .map(([k, v]) => ({ k, s: fmt(v, "") }))
+            .filter(({ s }) => s && s !== "none")
+            .map(({ k, s }) => `  - ${k}: ${s}`);
           if (cfEntries.length > 0) {
             result += `\n\nCustom fields:\n${cfEntries.join("\n")}`;
           }
@@ -450,7 +446,8 @@ Use this tool to look up valid status IDs before:
     {},
     async () => {
       try {
-        const statuses = await client.get<PropstackPropertyStatus[]>("/property_statuses");
+        const res = await client.get<{ data?: PropstackPropertyStatus[] } | PropstackPropertyStatus[]>("/property_statuses");
+        const statuses = Array.isArray(res) ? res : (res?.data ?? []);
 
         if (!statuses || statuses.length === 0) {
           return textResult("No property statuses configured.");

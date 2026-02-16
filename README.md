@@ -68,7 +68,47 @@ Add to your project's `.mcp.json`:
 3. Set the command to `npx -y propstack-mcp-server`
 4. Add environment variable `PROPSTACK_API_KEY`
 
-### 2d. Run directly
+### 2d. Cursor IDE
+
+1. Open **Settings** (Ctrl+,) → search "MCP"
+2. Edit **MCP Servers** JSON, or add `mcp.json` in project root / `.cursor/`
+
+**Option A — local project** (after `npm run build`):
+
+```json
+{
+  "mcpServers": {
+    "propstack": {
+      "command": "node",
+      "args": ["./dist/index.js"],
+      "cwd": "C:/Users/you/path/to/propstack_mcp",
+      "env": {
+        "PROPSTACK_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+Or use `.env` in project root — the server loads it automatically; you can omit the `env` block.
+
+**Option B — npx** (published package or `npx` from local):
+
+```json
+{
+  "mcpServers": {
+    "propstack": {
+      "command": "npx",
+      "args": ["-y", "propstack-mcp-server"],
+      "env": {
+        "PROPSTACK_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+### 2e. Run directly
 
 ```bash
 npm install propstack-mcp-server
@@ -175,8 +215,11 @@ Get your Propstack API key:
 |---|---|
 | `list_pipelines` | Get deal pipelines with stages (IDs, names, positions) |
 | `get_pipeline` | Get a single pipeline with stage details |
-| `list_tags` | List tags/labels (Merkmale) — hierarchical with Obermerkmale |
+| `list_tags` | List tags/groups (Merkmale) — filter contacts by group IDs |
 | `create_tag` | Create a new tag for contacts, properties, or activities |
+| `list_activity_types` | List note/todo/event templates for create_task |
+| `list_contact_statuses` | List contact statuses for search/assign |
+| `list_reservation_reasons` | List deal cancellation reasons |
 | `list_custom_fields` | Discover custom field definitions (names, types, options) |
 | `list_users` | List all brokers/agents with contact info |
 | `list_teams` | List teams/departments with member assignments |

@@ -91,9 +91,52 @@ export function errorResult(entity: string, err: unknown) {
   return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true as const };
 }
 
+/**
+ * Propstack API with new=1/expand=1 returns nested objects like { value: X } or
+ * { value: X, pretty_value: Y }. Unwrap to the underlying primitive for display.
+ */
+export function unwrapPropstackValue(val: unknown): unknown {
+  if (val === null || val === undefined) return val;
+  if (typeof val === "object" && val !== null) {
+    const o = val as Record<string, unknown>;
+    if ("pretty_value" in o && o.pretty_value != null && o.pretty_value !== "") {
+      return unwrapPropstackValue(o.pretty_value);
+    }
+    if ("value" in o) {
+      return unwrapPropstackValue(o.value);
+    }
+  }
+  return val;
+}
+
 export function fmt(value: unknown, fallback = "none"): string {
-  if (value === null || value === undefined || value === "") return fallback;
-  return String(value);
+  const v = unwrapPropstackValue(value);
+  if (v === null || v === undefined || v === "") return fallback;
+  if (typeof v === "object") return fallback;
+  return String(v);
+}
+
+/** Unwrap and coerce to number for price/area formatting. */
+export function unwrapNumber(val: unknown): number | null {
+  const v = unwrapPropstackValue(val);
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? null : n;
+  }
+  return null;
+}
+
+export function fmtPrice(value: unknown): string {
+  const n = unwrapNumber(value);
+  if (n === null) return "none";
+  return n.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+}
+
+export function fmtArea(value: unknown, unit = "m²"): string {
+  const n = unwrapNumber(value);
+  if (n === null) return "none";
+  return `${n} ${unit}`;
 }
 
 export function fmtNested(obj: unknown, key: string, fallback = "none"): string {

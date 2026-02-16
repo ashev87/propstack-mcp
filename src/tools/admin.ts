@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackWebhook, PropstackProperty } from "../types/propstack.js";
-import { textResult, errorResult, fmt } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice } from "./helpers.js";
 
 // ── Tool registration ────────────────────────────────────────────────
 
@@ -178,14 +178,14 @@ interested in.`,
         }
 
         const lines = favorites.map((p) => {
-          const addr = [p.street, p.house_number].filter(Boolean).join(" ");
-          const city = [p.zip_code, p.city].filter(Boolean).join(" ");
+          const addr = [fmt(p.street, ""), fmt(p.house_number, "")].filter(Boolean).join(" ");
+          const city = [fmt(p.zip_code, ""), fmt(p.city, "")].filter(Boolean).join(" ");
           const fullAddr = [addr, city].filter(Boolean).join(", ");
-          const price = p.price
-            ? p.price.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
-            : (p.base_rent
-              ? `${p.base_rent.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}/mo`
-              : "no price");
+          const price = fmtPrice(p.price) !== "none"
+            ? fmtPrice(p.price)
+            : fmtPrice(p.base_rent) !== "none"
+              ? fmtPrice(p.base_rent) + "/mo"
+              : "no price";
           return `- **${fmt(p.title, "Untitled")}** (ID: ${p.id}) — ${fullAddr || "no address"} — ${price}`;
         });
 

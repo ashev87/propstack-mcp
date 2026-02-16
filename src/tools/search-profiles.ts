@@ -2,31 +2,32 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackSearchProfile, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, stripUndefined, unwrapNumber, unwrapPropstackValue } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
-function fmtRange(from: number | null | undefined, to: number | null | undefined, unit = ""): string | null {
-  if (from === null && to === null) return null;
-  if (from === undefined && to === undefined) return null;
-  if (from !== null && from !== undefined && to !== null && to !== undefined) {
-    return `${from}–${to}${unit ? ` ${unit}` : ""}`;
-  }
-  if (from !== null && from !== undefined) return `≥ ${from}${unit ? ` ${unit}` : ""}`;
-  return `≤ ${to}${unit ? ` ${unit}` : ""}`;
+function fmtRange(from: unknown, to: unknown, unit = ""): string | null {
+  const f = unwrapNumber(from);
+  const t = unwrapNumber(to);
+  if (f === null && t === null) return null;
+  if (f !== null && t !== null) return `${f}–${t}${unit ? ` ${unit}` : ""}`;
+  if (f !== null) return `≥ ${f}${unit ? ` ${unit}` : ""}`;
+  return t !== null ? `≤ ${t}${unit ? ` ${unit}` : ""}` : null;
 }
 
-function fmtPriceRange(from: number | null | undefined, to: number | null | undefined): string | null {
-  const format = (v: number) => v.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-  if ((from === null || from === undefined) && (to === null || to === undefined)) return null;
-  if (from !== null && from !== undefined && to !== null && to !== undefined) return `${format(from)} – ${format(to)}`;
-  if (from !== null && from !== undefined) return `≥ ${format(from)}`;
-  return `≤ ${format(to!)}`;
+function fmtPriceRange(from: unknown, to: unknown): string | null {
+  const f = unwrapNumber(from);
+  const t = unwrapNumber(to);
+  if (f === null && t === null) return null;
+  if (f !== null && t !== null) return `${fmtPrice(f)} – ${fmtPrice(t)}`;
+  if (f !== null) return `≥ ${fmtPrice(f)}`;
+  return t !== null ? `≤ ${fmtPrice(t)}` : null;
 }
 
-function fmtFeature(value: boolean | null | undefined): string {
-  if (value === true) return "yes";
-  if (value === false) return "no";
+function fmtFeature(value: unknown): string {
+  const v = unwrapPropstackValue(value);
+  if (v === true || v === "true") return "yes";
+  if (v === false || v === "false") return "no";
   return "any";
 }
 
@@ -92,7 +93,7 @@ function formatSearchProfile(sp: PropstackSearchProfile): string {
   const yld = fmtRange(sp.yield_actual, sp.yield_actual_to, "%");
   if (yld) lines.push(`Yield: ${yld}`);
 
-  if (sp.note) lines.push(`Note: ${sp.note}`);
+  if (fmt(sp.note, "")) lines.push(`Note: ${fmt(sp.note)}`);
   lines.push(`Created: ${fmt(sp.created_at)}`);
 
   return lines.filter(Boolean).join("\n");

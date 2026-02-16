@@ -4,6 +4,39 @@ import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackContact, PropstackContactSource, PropstackPaginatedResponse } from "../types/propstack.js";
 import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
 
+/**
+ * Generate search variants for a phone number. Propstack normalizes spaces/dashes
+ * but not +49 vs 0 (German formats). Try both to maximize match rate.
+ */
+function phoneSearchVariants(phone: string): string[] {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 0) return [phone];
+
+  const variants: string[] = [phone];
+
+  // German: 0xxx... <-> +49xxx...
+  if (digits.startsWith("49") && digits.length >= 12) {
+    const national = "0" + digits.slice(2);
+    if (!variants.includes(national)) variants.push(national);
+  }
+  if (digits.startsWith("0") && digits.length >= 11) {
+    const international = "+49" + digits.slice(1);
+    if (!variants.includes(international)) variants.push(international);
+  }
+
+  return variants;
+}
+
+/** Propstack contacts API may return { data, meta } or a raw array depending on endpoint/params. */
+function normalizeContactsResponse(
+  raw: PropstackPaginatedResponse<PropstackContact> | PropstackContact[],
+): PropstackPaginatedResponse<PropstackContact> {
+  if (Array.isArray(raw)) {
+    return { data: raw };
+  }
+  return raw;
+}
+
 // ── Response formatting ──────────────────────────────────────────────
 
 const GDPR_LABELS = ["Keine Angabe", "Ignoriert", "Zugestimmt", "Widerrufen"] as const;
@@ -14,9 +47,9 @@ function stars(rating: number): string {
 }
 
 function formatContact(c: PropstackContact): string {
-  const name = c.name ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
+  const name = fmt(c.name) !== "none" ? fmt(c.name) : [fmt(c.first_name, ""), fmt(c.last_name, "")].filter(Boolean).join(" ");
   const lines: (string | null)[] = [
-    `**${name}** (ID: ${c.id})`,
+    `**${name || "Unnamed"}** (ID: ${c.id})`,
     `Email: ${fmt(c.email)}`,
     `Phone: ${fmt(c.phone ?? c.home_cell)}`,
     `Status: ${fmt(c.client_status?.name)}`,
@@ -24,7 +57,7 @@ function formatContact(c: PropstackContact): string {
     `Rating: ${stars(c.rating ?? 0)}`,
     `Last contact: ${fmt(c.last_contact_at_formatted, "never")}`,
     `GDPR: ${GDPR_LABELS[c.gdpr_status ?? 0] ?? "unknown"}`,
-    c.warning_notice ? `Warning: ${c.warning_notice}` : null,
+    fmt(c.warning_notice, "") ? `Warning: ${fmt(c.warning_notice)}` : null,
   ];
   return lines.filter(Boolean).join("\n");
 }
@@ -109,10 +142,11 @@ custom fields.`,
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackContact>>(
+        const raw = await client.get<PropstackPaginatedResponse<PropstackContact> | PropstackContact[]>(
           "/contacts",
           { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
         );
+        const res = normalizeContactsResponse(raw);
 
         if (!res.data || res.data.length === 0) {
           return textResult("No contacts found matching your criteria.");
@@ -395,21 +429,37 @@ the caller is unknown and you should create a new contact.`,
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackContact>>(
-          "/contacts",
-          { params: { phone_number: args.phone_number } },
-        );
+        const variants = phoneSearchVariants(args.phone_number);
+        const seenIds = new Set<number>();
+        const contacts: PropstackContact[] = [];
 
-        if (!res.data || res.data.length === 0) {
+        for (const variant of variants) {
+          const raw = await client.get<PropstackPaginatedResponse<PropstackContact> | PropstackContact[]>(
+            "/contacts",
+            { params: { phone_number: variant } },
+          );
+          const res = normalizeContactsResponse(raw);
+          if (res.data?.length) {
+            for (const c of res.data) {
+              if (!seenIds.has(c.id)) {
+                seenIds.add(c.id);
+                contacts.push(c);
+              }
+            }
+            break;
+          }
+        }
+
+        if (contacts.length === 0) {
           return textResult(`No contact found for phone number ${args.phone_number}. This is an unknown caller.`);
         }
 
-        if (res.data.length === 1) {
-          return textResult(`Caller identified:\n\n${formatContact(res.data[0]!)}`);
+        if (contacts.length === 1) {
+          return textResult(`Caller identified:\n\n${formatContact(contacts[0]!)}`);
         }
 
-        const header = `Found ${res.data.length} contacts matching ${args.phone_number}:\n\n`;
-        const formatted = res.data.map(formatContact).join("\n\n---\n\n");
+        const header = `Found ${contacts.length} contacts matching ${args.phone_number}:\n\n`;
+        const formatted = contacts.map(formatContact).join("\n\n---\n\n");
         return textResult(header + formatted);
       } catch (err) {
         return errorResult("Contact", err);

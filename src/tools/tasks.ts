@@ -17,7 +17,7 @@ function formatTask(t: PropstackTask): string {
   const lines: (string | null)[] = [
     `**${fmt(t.title, "Untitled")}** (ID: ${t.id})`,
     `Type: ${taskMode(t)}`,
-    t.body ? `Body: ${t.body}` : null,
+    fmt(t.body, "") ? `Body: ${fmt(t.body)}` : null,
     `Broker: ${fmt(t.broker_id, "unassigned")}`,
   ];
 
@@ -32,7 +32,7 @@ function formatTask(t: PropstackTask): string {
   if (t.is_event) {
     lines.push(`Starts: ${fmt(t.starts_at)}`);
     lines.push(`Ends: ${fmt(t.ends_at)}`);
-    lines.push(t.location ? `Location: ${t.location}` : null);
+    lines.push(fmt(t.location, "") ? `Location: ${fmt(t.location)}` : null);
     lines.push(t.all_day ? `All day: yes` : null);
     lines.push(t.private ? `Private: yes` : null);
     lines.push(t.recurring ? `Recurring: yes (${fmt(t.rrule)})` : null);
@@ -55,7 +55,7 @@ function formatTask(t: PropstackTask): string {
 
   // Include-expanded relations
   if (t.clients?.length) {
-    const names = t.clients.map((c) => `${c.name ?? [c.first_name, c.last_name].filter(Boolean).join(" ")} (${c.id})`);
+    const names = t.clients.map((c) => `${fmt(c.name) !== "none" ? fmt(c.name) : [fmt(c.first_name, ""), fmt(c.last_name, "")].filter(Boolean).join(" ") || "Unnamed"} (${c.id})`);
     lines.push(`Contacts: ${names.join(", ")}`);
   }
   if (t.units?.length) {

@@ -2,20 +2,15 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackDeal, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, stripUndefined } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
 const FEELING_LABELS = ["none", "cold", "warm", "hot"] as const;
 
-function fmtPrice(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "none";
-  return value.toLocaleString("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-}
-
 function formatDeal(d: PropstackDeal): string {
   const clientName = d.client
-    ? (d.client.name ?? [d.client.first_name, d.client.last_name].filter(Boolean).join(" "))
+    ? (fmt(d.client.name) !== "none" ? fmt(d.client.name) : [fmt(d.client.first_name, ""), fmt(d.client.last_name, "")].filter(Boolean).join(" ") || "Unnamed")
     : `Contact #${d.client_id ?? "?"}`;
 
   const propertyTitle = d.property
@@ -44,8 +39,8 @@ function formatDeal(d: PropstackDeal): string {
 
   // Show expanded property details
   if (d.property) {
-    const addr = [d.property.street, d.property.house_number].filter(Boolean).join(" ");
-    const city = [d.property.zip_code, d.property.city].filter(Boolean).join(" ");
+    const addr = [fmt(d.property.street, ""), fmt(d.property.house_number, "")].filter(Boolean).join(" ");
+    const city = [fmt(d.property.zip_code, ""), fmt(d.property.city, "")].filter(Boolean).join(" ");
     const fullAddr = [addr, city].filter(Boolean).join(", ");
     lines.push(`Property: ${propertyTitle} (ID: ${d.property.id}, ${fullAddr || "no address"}, ${fmtPrice(d.property.price)})`);
   }
@@ -55,7 +50,7 @@ function formatDeal(d: PropstackDeal): string {
 
 function formatDealRow(d: PropstackDeal): string {
   const clientName = d.client
-    ? (d.client.name ?? [d.client.first_name, d.client.last_name].filter(Boolean).join(" "))
+    ? (fmt(d.client.name) !== "none" ? fmt(d.client.name) : [fmt(d.client.first_name, ""), fmt(d.client.last_name, "")].filter(Boolean).join(" ") || "Unnamed")
     : String(d.client_id ?? "?");
 
   const propertyTitle = d.property
@@ -188,15 +183,15 @@ Use this tool after:
 - A contact inquiry about a property
 - Moving a lead into the sales pipeline
 
-Requires client_id, property_id, and deal_stage_id. Use search_deal_pipelines
-to find valid pipeline and stage IDs.`,
+Requires client_id, property_id, and deal_stage_id. Use list_pipelines or
+get_pipeline to find valid pipeline and stage IDs.`,
     {
       client_id: z.number()
         .describe("Contact ID (required)"),
       property_id: z.number()
         .describe("Property ID (required)"),
       deal_stage_id: z.number()
-        .describe("Pipeline stage ID (required — use search_deal_pipelines to look up)"),
+        .describe("Pipeline stage ID (required — use list_pipelines or get_pipeline to look up)"),
       broker_id: z.number().optional()
         .describe("Assigned broker ID"),
       deal_pipeline_id: z.number().optional()
