@@ -1,7 +1,7 @@
 {
   "name": "propstack-mcp-server",
   "mcpName": "io.github.ashev87/propstack-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "MCP server for Propstack real estate CRM — connect AI assistants to your Propstack data",
   "main": "dist/index.js",
