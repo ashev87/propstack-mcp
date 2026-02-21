@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ashev87/propstack-mcp",
+  "description": "Propstack CRM MCP: search contacts, manage properties, track deals, schedule viewings.",
+  "version": "1.0.1",
+  "repository": {
+    "url": "https://github.com/ashev87/propstack-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "propstack-mcp-server",
+      "version": "1.0.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PROPSTACK_API_KEY",
+          "description": "Your Propstack API key from crm.propstack.de/app/admin/api_keys",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

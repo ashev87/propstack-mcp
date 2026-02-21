@@ -6,3 +6,10 @@ dist/
 Claude.md
 mcp.json
 .cursor/
+
+# mcp-publisher CLI (download per machine)
+mcp-publisher.exe
+mcp-publisher.tar.gz
+
+# mcp-publisher auth tokens
+.mcpregistry_*

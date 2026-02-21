@@ -1,321 +1,153 @@
-# Propstack MCP Server
+# MCP Registry
 
-Connect AI assistants (Claude, ChatGPT) to your Propstack real estate CRM.
+The MCP registry provides MCP clients with a list of MCP servers, like an app store for MCP servers.
 
-> **Verbinden Sie KI-Assistenten mit Ihrem Propstack-CRM** — Kontakte verwalten, Objekte durchsuchen, Deals pflegen, Besichtigungen planen und Suchprofile erstellen, alles per Sprache oder Chat.
+[**📤 Publish my MCP server**](docs/modelcontextprotocol-io/quickstart.mdx) | [**⚡️ Live API docs**](https://registry.modelcontextprotocol.io/docs) | [**👀 Ecosystem vision**](docs/design/ecosystem-vision.md) | 📖 **[Full documentation](./docs)**
 
-## What you can do / Was Sie damit machen koennen
+## Development Status
 
-- **Contact management** — search, create, update, and tag contacts with GDPR tracking
-- **Property search & management** — filter by price, rooms, area, status; create and update listings
-- **Deal pipeline** — create deals, move through stages, track win/loss rates
-- **Buyer matching** — create search profiles from natural language ("3-Zimmer in Berlin, bis 400k, mit Balkon") and auto-match to new listings
-- **Task & calendar** — log call notes, set follow-up reminders, schedule viewings
-- **Email** — send templated emails linked to contacts and properties
-- **360-degree contact view** — get a complete briefing before every call
-- **Pipeline dashboards** — deal counts and values per stage, stale deal alerts
-- **Lead intake** — one-call workflow: dedup, create contact, log notes, create deal, set reminder
-- **Bulk export** — full data dumps for reporting, backup, or migration
+**2025-10-24 update**: The Registry API has entered an **API freeze (v0.1)** 🎉. For the next month or more, the API will remain stable with no breaking changes, allowing integrators to confidently implement support. This freeze applies to v0.1 while development continues on v0. We'll use this period to validate the API in real-world integrations and gather feedback to shape v1 for general availability. Thank you to everyone for your contributions and patience—your involvement has been key to getting us here!
 
-## Quick Start
+**2025-09-08 update**: The registry has launched in preview 🎉 ([announcement blog post](https://blog.modelcontextprotocol.io/posts/2025-09-08-mcp-registry-preview/)). While the system is now more stable, this is still a preview release and breaking changes or data resets may occur. A general availability (GA) release will follow later. We'd love your feedback in [GitHub discussions](https://github.com/modelcontextprotocol/registry/discussions/new?category=ideas) or in the [#registry-dev Discord](https://discord.com/channels/1358869848138059966/1369487942862504016) ([joining details here](https://modelcontextprotocol.io/community/communication)).
 
-### 1. Set your API key
+Current key maintainers:
+- **Adam Jones** (Anthropic) [@domdomegg](https://github.com/domdomegg)  
+- **Tadas Antanavicius** (PulseMCP) [@tadasant](https://github.com/tadasant)
+- **Toby Padilla** (GitHub) [@toby](https://github.com/toby)
+- **Radoslav (Rado) Dimitrov** (Stacklok) [@rdimitrov](https://github.com/rdimitrov)
 
-```bash
-export PROPSTACK_API_KEY=your_api_key_here
-```
+## Contributing
 
-### 2a. Claude Desktop
+We use multiple channels for collaboration - see [modelcontextprotocol.io/community/communication](https://modelcontextprotocol.io/community/communication).
 
-Add to your Claude Desktop config (`claude_desktop_config.json`):
+Often (but not always) ideas flow through this pipeline:
 
-```json
-{
-  "mcpServers": {
-    "propstack": {
-      "command": "npx",
-      "args": ["-y", "propstack-mcp-server"],
-      "env": {
-        "PROPSTACK_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
+- **[Discord](https://modelcontextprotocol.io/community/communication)** - Real-time community discussions
+- **[Discussions](https://github.com/modelcontextprotocol/registry/discussions)** - Propose and discuss product/technical requirements
+- **[Issues](https://github.com/modelcontextprotocol/registry/issues)** - Track well-scoped technical work  
+- **[Pull Requests](https://github.com/modelcontextprotocol/registry/pulls)** - Contribute work towards issues
 
-### 2b. Claude Code (CLI)
+### Quick start:
 
-Add to your project's `.mcp.json`:
+#### Pre-requisites
 
-```json
-{
-  "mcpServers": {
-    "propstack": {
-      "command": "npx",
-      "args": ["-y", "propstack-mcp-server"],
-      "env": {
-        "PROPSTACK_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
+- **Docker**
+- **Go 1.24.x**
+- **ko** - Container image builder for Go ([installation instructions](https://ko.build/install/))
+- **golangci-lint v2.4.0**
 
-### 2c. ChatGPT
-
-1. Go to **Settings > Connectors > Developer Mode**
-2. Add a new MCP connector
-3. Set the command to `npx -y propstack-mcp-server`
-4. Add environment variable `PROPSTACK_API_KEY`
-
-### 2d. Cursor IDE
-
-1. Open **Settings** (Ctrl+,) → search "MCP"
-2. Edit **MCP Servers** JSON, or add `mcp.json` in project root / `.cursor/`
-
-**Option A — local project** (after `npm run build`):
-
-```json
-{
-  "mcpServers": {
-    "propstack": {
-      "command": "node",
-      "args": ["./dist/index.js"],
-      "cwd": "C:/Users/you/path/to/propstack_mcp",
-      "env": {
-        "PROPSTACK_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-Or use `.env` in project root — the server loads it automatically; you can omit the `env` block.
-
-**Option B — npx** (published package or `npx` from local):
-
-```json
-{
-  "mcpServers": {
-    "propstack": {
-      "command": "npx",
-      "args": ["-y", "propstack-mcp-server"],
-      "env": {
-        "PROPSTACK_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-### 2e. Run directly
+#### Running the server
 
 ```bash
-npm install propstack-mcp-server
-PROPSTACK_API_KEY=your_key npx propstack-mcp-server
+# Start full development environment
+make dev-compose
 ```
 
-## API Key / API-Schluessel
+This starts the registry at [`localhost:8080`](http://localhost:8080) with PostgreSQL. The database uses ephemeral storage and is reset each time you restart the containers, ensuring a clean state for development and testing.
 
-Get your Propstack API key:
+**Note:** The registry uses [ko](https://ko.build) to build container images. The `make dev-compose` command automatically builds the registry image with ko and loads it into your local Docker daemon before starting the services.
 
-1. Log in to [crm.propstack.de](https://crm.propstack.de)
-2. Go to **Verwaltung > API-Schluessel** (Administration > API Keys)
-3. Create or copy your V1 API key
+By default, the registry seeds from the production API with a filtered subset of servers (to keep startup fast). This ensures your local environment mirrors production behavior and all seed data passes validation. For offline development you can seed from a file without validation with `MCP_REGISTRY_SEED_FROM=data/seed.json MCP_REGISTRY_ENABLE_REGISTRY_VALIDATION=false make dev-compose`.
 
-> **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
+The setup can be configured with environment variables in [docker-compose.yml](./docker-compose.yml) - see [.env.example](./.env.example) for a reference.
 
-## Available Tools (50)
+<details>
+<summary>Alternative: Running a pre-built Docker image</summary>
 
-### Contacts (Kontakte)
-
-| Tool | Description |
-|---|---|
-| `search_contacts` | Search and filter contacts by name, email, phone, status, tags, broker, GDPR status |
-| `get_contact` | Get full details of a single contact with related data |
-| `create_contact` | Create a new contact (auto-dedup by email) |
-| `update_contact` | Update contact details, tags, GDPR status, broker assignment |
-| `delete_contact` | Soft-delete a contact (30-day recycle bin) |
-| `get_contact_sources` | List lead sources (ImmoScout24, Website, Empfehlung, etc.) |
-| `search_contacts_by_phone` | Look up a contact by phone number (formatting-insensitive) |
-
-### Properties (Objekte)
-
-| Tool | Description |
-|---|---|
-| `search_properties` | Search properties with 11 range filters, 17 sort fields |
-| `get_property` | Get full property details including media and custom fields |
-| `create_property` | Create a new property listing |
-| `update_property` | Update price, status, description, broker assignment |
-| `get_property_statuses` | List property statuses (Verfuegbar, Reserviert, Verkauft, etc.) |
-
-### Tasks (Aufgaben & Notizen)
-
-| Tool | Description |
-|---|---|
-| `create_task` | Create a note, to-do, appointment, or cancellation (polymorphic) |
-| `update_task` | Mark done, reschedule, update notes |
-| `get_task` | Get task details with linked contacts, properties, projects |
-
-### Deals (Pipeline)
-
-| Tool | Description |
-|---|---|
-| `search_deals` | Search deals by stage, pipeline, category, broker, feeling score |
-| `create_deal` | Link a contact to a property at a pipeline stage |
-| `update_deal` | Move deal through pipeline stages, update price/notes |
-
-### Search Profiles (Suchprofile)
-
-| Tool | Description |
-|---|---|
-| `list_search_profiles` | List what buyers/renters are looking for |
-| `create_search_profile` | Capture buyer criteria from natural language |
-| `update_search_profile` | Adjust budget, cities, room count, features |
-| `delete_search_profile` | Remove a search profile |
-
-### Projects (Projekte)
-
-| Tool | Description |
-|---|---|
-| `list_projects` | List development projects with unit counts |
-| `get_project` | Get project details with all units, media, documents |
-
-### Activities & Events (Aktivitaeten & Termine)
-
-| Tool | Description |
-|---|---|
-| `search_activities` | Full activity timeline for a contact, property, or project |
-| `list_events` | Calendar events — viewings, meetings, filtered by date/state |
-
-### Emails (E-Mails)
-
-| Tool | Description |
-|---|---|
-| `send_email` | Send email using a Propstack template (snippet) |
-| `update_email` | Mark read/archived, categorize, link to CRM records |
-
-### Documents (Dokumente)
-
-| Tool | Description |
-|---|---|
-| `list_documents` | List files attached to a property, project, or contact |
-| `upload_document` | Upload a document (base64 data URI) |
-
-### Relationships (Beziehungen)
-
-| Tool | Description |
-|---|---|
-| `create_ownership` | Link a contact as property owner (Eigentuemer) |
-| `create_partnership` | Link a contact as buyer, tenant, etc. (Kaeufer, Mieter) |
-
-### Lookups (Konfiguration)
-
-| Tool | Description |
-|---|---|
-| `list_pipelines` | Get deal pipelines with stages (IDs, names, positions) |
-| `get_pipeline` | Get a single pipeline with stage details |
-| `list_tags` | List tags/groups (Merkmale) — filter contacts by group IDs |
-| `create_tag` | Create a new tag for contacts, properties, or activities |
-| `list_activity_types` | List note/todo/event templates for create_task |
-| `list_contact_statuses` | List contact statuses for search/assign |
-| `list_reservation_reasons` | List deal cancellation reasons |
-| `list_custom_fields` | Discover custom field definitions (names, types, options) |
-| `list_users` | List all brokers/agents with contact info |
-| `list_teams` | List teams/departments with member assignments |
-| `list_locations` | List geographic areas (Geolagen) for location matching |
-
-### Smart Composites (Intelligente Workflows)
-
-| Tool | Description |
-|---|---|
-| `full_contact_360` | Complete contact dossier — info, search profiles, deals, activity |
-| `property_performance_report` | Days on market, inquiry count, pipeline breakdown, activity summary |
-| `pipeline_summary` | Deals per stage, total values, stale deals needing attention |
-| `smart_lead_intake` | Full lead workflow: dedup, create/update, log notes, deal, reminder |
-| `match_contacts_to_property` | Find buyers whose search profiles match a property |
-
-### Admin (Verwaltung)
-
-| Tool | Description |
-|---|---|
-| `list_webhooks` | List all configured webhook subscriptions |
-| `create_webhook` | Subscribe to CRM events (CLIENT_CREATED, PROPERTY_UPDATED, etc.) |
-| `delete_webhook` | Remove a webhook subscription |
-| `export_data` | Bulk export an entire data table as JSON |
-| `get_contact_favorites` | Get properties a contact has favorited |
-
-## Example Conversations / Beispiel-Konversationen
-
-### Morning Briefing / Morgen-Briefing
-
-> **You:** What's on my calendar today?
->
-> **AI:** *calls `list_events` with today's date range* — You have 3 viewings scheduled...
-
-> **Du:** Gibt es neue Leads seit gestern?
->
-> **KI:** *ruft `search_contacts` mit created_at_from=gestern auf* — 5 neue Kontakte...
-
-### Lead Intake / Leaderfassung
-
-> **You:** I just got off the phone with Maria Schmidt, +49 157 1234 5678. She's looking for a 3-room apartment in Berlin, budget 300-400k, must have a balcony. She found us on ImmoScout.
->
-> **AI:** *calls `smart_lead_intake`* — Contact created (ID: 4521), call note logged, follow-up reminder set for tomorrow 9:00. Would you like me to create a search profile for her criteria?
-
-### Property Matching / Objekt-Matching
-
-> **Du:** Wir haben ein neues Listing: 3-Zimmer-Wohnung in Charlottenburg, 385.000 EUR. Wer kommt als Kaeufer in Frage?
->
-> **KI:** *ruft `match_contacts_to_property` auf* — 12 passende Suchprofile gefunden. Top 3: Herr Weber (Score 95%), Frau Mueller (Score 88%), Herr Kim (Score 85%)...
-
-### Pipeline Review
-
-> **You:** How's our sales pipeline looking? Any stale deals?
->
-> **AI:** *calls `pipeline_summary`* — 47 active deals, total value 12.3M EUR. 5 deals haven't been updated in 14+ days...
-
-### Pre-Call Briefing / Vor dem Anruf
-
-> **Du:** Gib mir alles ueber Kontakt 3847 — ich rufe gleich an.
->
-> **KI:** *ruft `full_contact_360` auf* — Herr Weber, Rating 3 Sterne, sucht 3-Zimmer in Berlin/Potsdam bis 400k. 2 aktive Deals, letzte Aktivitaet vor 3 Tagen...
-
-## Development
+Pre-built Docker images are automatically published to GitHub Container Registry:
 
 ```bash
-git clone <repo-url>
-cd propstack-mcp-server
-npm install
-npm run build    # tsc → dist/
-npm start        # requires PROPSTACK_API_KEY
+# Run latest stable release
+docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:latest
+
+# Run latest from main branch (continuous deployment)
+docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:main
+
+# Run specific release version
+docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:v1.0.0
+
+# Run development build from main branch
+docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:main-20250906-abc123d
 ```
+
+**Available tags:** 
+- **Releases**: `latest`, `v1.0.0`, `v1.1.0`, etc.
+- **Continuous**: `main` (latest main branch build)
+- **Development**: `main-<date>-<sha>` (specific commit builds)
+
+</details>
+
+#### Publishing a server
+
+To publish a server, we've built a simple CLI. You can use it with:
+
+```bash
+# Build the latest CLI
+make publisher
+
+# Use it!
+./bin/mcp-publisher --help
+```
+
+See [the publisher guide](./docs/modelcontextprotocol-io/quickstart.mdx) for more details.
+
+#### Other commands
+
+```bash
+# Run lint, unit tests and integration tests
+make check
+```
+
+There are also a few more helpful commands for development. Run `make help` to learn more, or look in [Makefile](./Makefile).
+
+<!--
+For Claude and other AI tools: Always prefer make targets over custom commands where possible.
+-->
+
+## Architecture
 
 ### Project Structure
 
 ```
-src/
-  index.ts                 # Server entry point (stdio transport)
-  propstack-client.ts      # HTTP client with auth, retry, error handling
-  types/
-    propstack.ts           # TypeScript interfaces for all API responses
-  tools/
-    helpers.ts             # Shared formatting utilities
-    contacts.ts            # 7 contact tools
-    properties.ts          # 5 property tools
-    tasks.ts               # 3 task tools (polymorphic: note/todo/event/cancel)
-    deals.ts               # 3 deal pipeline tools
-    search-profiles.ts     # 4 search profile tools
-    projects.ts            # 2 project tools
-    activities.ts          # 2 activity/event tools
-    emails.ts              # 2 email tools
-    documents.ts           # 2 document tools
-    relationships.ts       # 2 relationship tools (ownership/partnership)
-    lookups.ts             # 8 lookup/config tools
-    composites.ts          # 5 smart composite tools
-    admin.ts               # 5 admin tools (webhooks, export, favorites)
+├── cmd/                     # Application entry points
+│   └── publisher/           # Server publishing tool
+├── data/                    # Seed data
+├── deploy/                  # Deployment configuration (Pulumi)
+├── docs/                    # Documentation
+├── internal/                # Private application code
+│   ├── api/                 # HTTP handlers and routing
+│   ├── auth/                # Authentication (GitHub OAuth, JWT, namespace blocking)
+│   ├── config/              # Configuration management
+│   ├── database/            # Data persistence (PostgreSQL)
+│   ├── service/             # Business logic
+│   ├── telemetry/           # Metrics and monitoring
+│   └── validators/          # Input validation
+├── pkg/                     # Public packages
+│   ├── api/                 # API types and structures
+│   │   └── v0/              # Version 0 API types
+│   └── model/               # Data models for server.json
+├── scripts/                 # Development and testing scripts
+├── tests/                   # Integration tests
+└── tools/                   # CLI tools and utilities
+    └── validate-*.sh        # Schema validation tools
 ```
 
-## License
+### Authentication
 
-MIT
+Publishing supports multiple authentication methods:
+- **GitHub OAuth** - For publishing by logging into GitHub
+- **GitHub OIDC** - For publishing from GitHub Actions
+- **DNS verification** - For proving ownership of a domain and its subdomains
+- **HTTP verification** - For proving ownership of a domain
+
+The registry validates namespace ownership when publishing. E.g. to publish...:
+- `io.github.domdomegg/my-cool-mcp` you must login to GitHub as `domdomegg`, or be in a GitHub Action on domdomegg's repos
+- `me.adamjones/my-cool-mcp` you must prove ownership of `adamjones.me` via DNS or HTTP challenge
+
+## Community Projects
+
+Check out [community projects](docs/community-projects.md) to explore notable registry-related work created by the community.
+
+## More documentation
+
+See the [documentation](./docs) for more details if your question has not been answered here!
