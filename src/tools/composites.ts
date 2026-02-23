@@ -12,7 +12,7 @@ import type {
   PropstackPaginatedResponse,
 } from "../types/propstack.js";
 import { textResult, errorResult, fmt, fmtPrice, fmtArea, formatError, stripUndefined, unwrapNumber } from "./helpers.js";
-import { enrichDealsWithStageNames } from "./deals.js";
+import { enrichDealsWithStageNames, fetchPipelines } from "./deals.js";
 
 function daysBetween(from: string, to: Date): number {
   return Math.floor((to.getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
@@ -62,7 +62,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
             "/activities",
             { params: { client_id: args.contact_id, per: 10 } },
           ),
-          client.get<PropstackDealPipeline[]>("/deal_pipelines"),
+          fetchPipelines(client),
         ]);
 
         // Contact is essential — if it fails, return error
@@ -251,7 +251,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             "/activities",
             { params: { property_id: args.property_id, per: 50 } },
           ),
-          client.get<PropstackDealPipeline[]>("/deal_pipelines"),
+          fetchPipelines(client),
         ]);
 
         // Property is essential
@@ -423,7 +423,7 @@ Filter by pipeline_id and/or broker_id. Use when asked:
     },
     async (args) => {
       try {
-        const pipelinesRes = await client.get<PropstackDealPipeline[]>("/deal_pipelines").then(
+        const pipelinesRes = await fetchPipelines(client).then(
           (v) => ({ status: "fulfilled" as const, value: v }),
           (e) => ({ status: "rejected" as const, reason: e }),
         );
@@ -668,7 +668,7 @@ Returns what was done: created vs updated, IDs of all created records.`,
         // Deal
         if (args.property_id) {
           // Get first pipeline stage
-          const pipelines = await client.get<PropstackDealPipeline[]>("/deal_pipelines");
+          const pipelines = await fetchPipelines(client);
           const firstPipeline = pipelines[0];
           const firstStage = firstPipeline?.deal_stages?.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0];
 

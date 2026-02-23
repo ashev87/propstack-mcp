@@ -14,6 +14,7 @@ import type {
   PropstackReservationReason,
 } from "../types/propstack.js";
 import { textResult, errorResult, fmt } from "./helpers.js";
+import { fetchPipelines } from "./deals.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -69,9 +70,9 @@ Typical stages: Anfrage → Besichtigung → Reserviert → Notartermin → Verk
     {},
     async () => {
       try {
-        const pipelines = await client.get<PropstackDealPipeline[]>("/deal_pipelines");
+        const pipelines = await fetchPipelines(client);
 
-        if (!pipelines || pipelines.length === 0) {
+        if (!pipelines.length) {
           return textResult("No deal pipelines configured.");
         }
 
@@ -97,9 +98,10 @@ already know which pipeline you need and want its stage details.`,
     },
     async (args) => {
       try {
-        const pipeline = await client.get<PropstackDealPipeline>(
+        const raw = await client.get<PropstackDealPipeline | { data: PropstackDealPipeline }>(
           `/deal_pipelines/${args.id}`,
         );
+        const pipeline = ("data" in raw && !("id" in raw)) ? (raw as { data: PropstackDealPipeline }).data : raw as PropstackDealPipeline;
 
         return textResult(formatPipeline(pipeline));
       } catch (err) {
@@ -246,26 +248,27 @@ To FILTER by custom fields: add cf_fieldname=value as a search param.`,
     },
     async (args) => {
       try {
-        const groups = await client.get<PropstackCustomFieldGroup[]>(
+        const raw = await client.get<{ data: PropstackCustomFieldGroup[] } | PropstackCustomFieldGroup[]>(
           "/custom_field_groups",
           { params: { entity: args.entity } },
         );
+        const groups = Array.isArray(raw) ? raw : raw?.data ?? [];
 
-        if (!groups || groups.length === 0) {
+        if (!groups.length) {
           return textResult(`No custom fields configured for ${args.entity}.`);
         }
 
         const lines: string[] = [];
         for (const g of groups) {
           lines.push(`**${fmt(g.name, "Default")}** (Group ID: ${g.id})`);
-          if (g.fields?.length) {
-            for (const f of g.fields) {
-              let desc = `  • \`${f.name}\` — ${fmt(f.pretty_name)} (${fmt(f.type)})`;
-              if (f.options?.length) {
-                desc += `\n    Options: ${f.options.join(", ")}`;
-              }
-              lines.push(desc);
+          const fields = g.custom_fields ?? [];
+          for (const f of fields) {
+            let desc = `  • \`${f.name}\` — ${fmt(f.pretty_name)} (${fmt(f.field_type)})`;
+            if (f.unit) desc += ` [${f.unit}]`;
+            if (f.custom_options?.length) {
+              desc += `\n    Options: ${f.custom_options.map((o) => o.name).join(", ")}`;
             }
+            lines.push(desc);
           }
         }
 
@@ -441,15 +444,22 @@ or filtering properties by area.`,
     {},
     async () => {
       try {
-        const locations = await client.get<PropstackLocation[]>("/locations");
+        const raw = await client.get<{ data: PropstackLocation[] } | PropstackLocation[]>("/locations");
+        const locations = Array.isArray(raw) ? raw : raw?.data ?? [];
 
-        if (!locations || locations.length === 0) {
+        if (!locations.length) {
           return textResult("No locations configured.");
         }
 
-        const lines = locations.map(
-          (l) => `- **${fmt(l.name)}** (ID: ${l.id})`,
-        );
+        const lines: string[] = [];
+        for (const l of locations) {
+          lines.push(`- **${fmt(l.name)}** (ID: ${l.id})`);
+          if (l.sub_locations?.length) {
+            for (const sub of l.sub_locations) {
+              lines.push(`  • ${fmt(sub.name)} (ID: ${sub.id})`);
+            }
+          }
+        }
 
         return textResult(`Locations:\n\n${lines.join("\n")}`);
       } catch (err) {

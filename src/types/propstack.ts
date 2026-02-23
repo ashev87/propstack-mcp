@@ -62,6 +62,7 @@ export interface PropstackReservationReason {
 export interface PropstackLocation {
   id: number;
   name: string | null;
+  sub_locations: PropstackLocation[] | null;
 }
 
 // ── Broker / Users ──────────────────────────────────────────────────
@@ -108,17 +109,26 @@ export interface PropstackSuperGroup {
 
 // ── Custom Fields ───────────────────────────────────────────────────
 
+export interface PropstackCustomFieldOption {
+  id: number;
+  name: string | null;
+}
+
 export interface PropstackCustomField {
+  id: number;
   name: string | null;
   pretty_name: string | null;
-  type: string | null;
-  options: string[] | null;
+  field_type: string | null;
+  position: number | null;
+  unit: string | null;
+  custom_options: PropstackCustomFieldOption[] | null;
 }
 
 export interface PropstackCustomFieldGroup {
   id: number;
   name: string | null;
-  fields: PropstackCustomField[] | null;
+  entity: string | null;
+  custom_fields: PropstackCustomField[] | null;
 }
 
 // ── Contact (Kontakt) ───────────────────────────────────────────────

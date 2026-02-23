@@ -8,6 +8,12 @@ import { textResult, errorResult, fmt, fmtPrice, stripUndefined } from "./helper
 
 const FEELING_LABELS = ["none", "cold", "warm", "hot"] as const;
 
+/** Fetch pipelines with safe unwrapping — API returns { data: [...] }. */
+export async function fetchPipelines(client: PropstackClient): Promise<PropstackDealPipeline[]> {
+  const raw = await client.get<{ data: PropstackDealPipeline[] } | PropstackDealPipeline[]>("/deal_pipelines");
+  return Array.isArray(raw) ? raw : raw?.data ?? [];
+}
+
 /** Build stage/pipeline name lookup from pipeline definitions and enrich deals in place. */
 export function enrichDealsWithStageNames(deals: PropstackDeal[], pipelines: PropstackDealPipeline[]): void {
   const stageMap = new Map<number, { name: string; pipeline: string }>();
@@ -193,7 +199,7 @@ Common queries:
             "/client_properties",
             { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
           ),
-          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+          fetchPipelines(client).catch(() => [] as PropstackDealPipeline[]),
         ]);
 
         if (!res.data || res.data.length === 0) {
@@ -264,7 +270,7 @@ get_pipeline to find valid pipeline and stage IDs.`,
             "/client_properties",
             { body: { client_property: stripUndefined(args) } },
           ),
-          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+          fetchPipelines(client).catch(() => [] as PropstackDealPipeline[]),
         ]);
 
         enrichDealsWithStageNames([deal], pipelines);
@@ -324,7 +330,7 @@ Only provide the fields you want to change.`,
             `/client_properties/${id}`,
             { body: { client_property: stripUndefined(fields) } },
           ),
-          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+          fetchPipelines(client).catch(() => [] as PropstackDealPipeline[]),
         ]);
 
         enrichDealsWithStageNames([deal], pipelines);
