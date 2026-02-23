@@ -168,6 +168,8 @@ export interface PropstackContact {
   client_source: PropstackContactSource | null;
   client_status_id: number | null;
   client_status: PropstackContactStatus | null;
+  /** API actually returns this field (not client_status) */
+  status: { id: number; label: string | null; name: string | null; color: string | null } | null;
   language: string | null;
   rating: number | null;
   newsletter: boolean | null;
@@ -286,7 +288,8 @@ export interface PropstackDeal {
   start_date: string | null;
   reservation_reason_id: number | null;
   feeling: number | null;
-  category: string | null;
+  /** category is a filter-only param — not returned in API response */
+  category?: string | null;
 
   // Expanded relations
   client: PropstackContact | null;
@@ -445,7 +448,7 @@ export interface PropstackProject {
   id: number;
   title: string | null;
   name: string | null;
-  status: string | null;
+  status: { label: string | null; color: string | null } | string | null;
   broker_id: number | null;
 
   // Address

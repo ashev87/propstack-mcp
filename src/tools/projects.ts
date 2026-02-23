@@ -74,23 +74,25 @@ Use expand=true to include custom fields in the response.`,
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackProject>>(
+        const raw = await client.get<PropstackPaginatedResponse<PropstackProject> | PropstackProject[]>(
           "/projects",
           { params: args as Record<string, string | number | boolean | undefined> },
         );
+        const projects = Array.isArray(raw) ? raw : raw.data ?? [];
+        const totalCount = Array.isArray(raw) ? undefined : raw.meta?.total_count;
 
-        if (!res.data || res.data.length === 0) {
+        if (projects.length === 0) {
           return textResult("No projects found.");
         }
 
-        const header = res.meta?.total_count !== undefined
-          ? `Found ${res.meta.total_count} projects (showing ${res.data.length}):\n\n`
-          : `Found ${res.data.length} projects:\n\n`;
+        const header = totalCount !== undefined
+          ? `Found ${totalCount} projects (showing ${projects.length}):\n\n`
+          : `Found ${projects.length} projects:\n\n`;
 
         const table = [
           "| ID | Title | Status | City | Units |",
           "|---|---|---|---|---|",
-          ...res.data.map(formatProjectRow),
+          ...projects.map(formatProjectRow),
         ].join("\n");
 
         return textResult(header + table);

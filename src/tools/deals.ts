@@ -63,7 +63,6 @@ function formatDeal(d: PropstackDeal): string {
     stageName || pipelineName
       ? [stageName, pipelineName].filter(Boolean).join(" | ")
       : null,
-    d.category ? `Category: ${d.category}` : null,
     d.sold_price ? `Price: ${fmtPrice(d.sold_price)}` : null,
     d.feeling !== null && d.feeling !== undefined
       ? `Feeling: ${FEELING_LABELS[d.feeling] ?? d.feeling}`
@@ -104,12 +103,11 @@ function formatDealRow(d: PropstackDeal): string {
     ? (d.deal_stage.name ?? `#${d.deal_stage_id}`)
     : d.deal_stage_id ? `#${d.deal_stage_id}` : "—";
 
-  const category = d.category ?? "—";
   const feeling = d.feeling !== null && d.feeling !== undefined
     ? (FEELING_LABELS[d.feeling] ?? String(d.feeling))
     : "—";
 
-  return `| ${d.id} | ${clientName} | ${propertyTitle} | ${stageName} | ${category} | ${feeling} | ${fmt(d.created_at, "—")} |`;
+  return `| ${d.id} | ${clientName} | ${propertyTitle} | ${stageName} | ${feeling} | ${fmt(d.created_at, "—")} |`;
 }
 
 // ── Tool registration ────────────────────────────────────────────────
@@ -214,8 +212,8 @@ Common queries:
           : `Found ${res.data.length} deals:\n\n`;
 
         const table = [
-          "| ID | Contact | Property | Stage | Category | Feeling | Created |",
-          "|---|---|---|---|---|---|---|",
+          "| ID | Contact | Property | Stage | Feeling | Created |",
+          "|---|---|---|---|---|---|",
           ...res.data.map(formatDealRow),
         ].join("\n");
 

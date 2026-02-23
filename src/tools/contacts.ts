@@ -52,7 +52,7 @@ function formatContact(c: PropstackContact): string {
     `**${name || "Unnamed"}** (ID: ${c.id})`,
     `Email: ${fmt(c.email)}`,
     `Phone: ${fmt(c.phone ?? c.home_cell)}`,
-    `Status: ${fmt(c.client_status?.name)}`,
+    `Status: ${fmt(c.status?.name ?? c.client_status?.name)}`,
     `Broker: ${fmt(c.broker?.name, "unassigned")}`,
     `Rating: ${stars(c.rating ?? 0)}`,
     `Last contact: ${fmt(c.last_contact_at_formatted, "never")}`,

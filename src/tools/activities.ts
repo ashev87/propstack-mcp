@@ -186,20 +186,21 @@ Event states:
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackEvent>>(
+        const raw = await client.get<{ events: PropstackEvent[]; meta?: { total_count: number } }>(
           "/events",
           { params: args as Record<string, string | number | boolean | undefined> },
         );
+        const events = raw.events ?? [];
 
-        if (!res.data || res.data.length === 0) {
+        if (events.length === 0) {
           return textResult("No events found matching your criteria.");
         }
 
-        const header = res.meta?.total_count !== undefined
-          ? `Found ${res.meta.total_count} events (showing ${res.data.length}):\n\n`
-          : `Found ${res.data.length} events:\n\n`;
+        const header = raw.meta?.total_count !== undefined
+          ? `Found ${raw.meta.total_count} events (showing ${events.length}):\n\n`
+          : `Found ${events.length} events:\n\n`;
 
-        const formatted = res.data.map(formatEvent).join("\n\n---\n\n");
+        const formatted = events.map(formatEvent).join("\n\n---\n\n");
         return textResult(header + formatted);
       } catch (err) {
         return errorResult("Event", err);

@@ -105,6 +105,14 @@ export function unwrapPropstackValue(val: unknown): unknown {
     if ("value" in o) {
       return unwrapPropstackValue(o.value);
     }
+    // Handle {label: "..."} pattern (project status, etc.)
+    if ("label" in o && typeof o.label === "string") {
+      return o.label;
+    }
+    // Handle {name: "..."} pattern (contact status, property status, etc.)
+    if ("name" in o && typeof o.name === "string") {
+      return o.name;
+    }
   }
   return val;
 }

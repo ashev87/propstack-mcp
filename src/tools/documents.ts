@@ -60,20 +60,21 @@ Filter by exactly one of property_id, project_id, or client_id.`,
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackDocument>>(
+        const raw = await client.get<{ documents: PropstackDocument[]; meta?: { total_count: number } }>(
           "/documents",
           { params: args as Record<string, string | number | boolean | undefined> },
         );
+        const docs = raw.documents ?? [];
 
-        if (!res.data || res.data.length === 0) {
+        if (docs.length === 0) {
           return textResult("No documents found.");
         }
 
-        const header = res.meta?.total_count !== undefined
-          ? `Found ${res.meta.total_count} documents (showing ${res.data.length}):\n\n`
-          : `Found ${res.data.length} documents:\n\n`;
+        const header = raw.meta?.total_count !== undefined
+          ? `Found ${raw.meta.total_count} documents (showing ${docs.length}):\n\n`
+          : `Found ${docs.length} documents:\n\n`;
 
-        const formatted = res.data.map(formatDocument).join("\n\n---\n\n");
+        const formatted = docs.map(formatDocument).join("\n\n---\n\n");
         return textResult(header + formatted);
       } catch (err) {
         return errorResult("Document", err);

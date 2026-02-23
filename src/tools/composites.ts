@@ -83,7 +83,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
           `Phone: ${fmt(contact.phone ?? contact.home_cell)}`,
           contact.company ? `Company: ${contact.company}` : null,
           contact.position ? `Position: ${contact.position}` : null,
-          `Status: ${fmt(contact.client_status?.name)}`,
+          `Status: ${fmt(contact.status?.name ?? contact.client_status?.name)}`,
           `Broker: ${fmt(contact.broker?.name, "unassigned")}`,
           `Rating: ${"★".repeat(Math.max(0, Math.min(3, contact.rating ?? 0)))}${"☆".repeat(3 - Math.max(0, Math.min(3, contact.rating ?? 0)))}`,
           `GDPR: ${(["Keine Angabe", "Ignoriert", "Zugestimmt", "Widerrufen"] as const)[contact.gdpr_status ?? 0] ?? "unknown"}`,
@@ -172,7 +172,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
               const stageName = d.deal_stage?.name ?? (d.deal_stage_id ? `Stage #${d.deal_stage_id}` : null);
               const parts = [
                 `**Deal #${d.id}**: ${propTitle}`,
-                [stageName, d.category].filter(Boolean).join(" | ") || null,
+                stageName || null,
               ].filter(Boolean) as string[];
               if (d.sold_price) parts.push(`  Price: ${fmtPrice(d.sold_price)}`);
               if (d.note) parts.push(`  Note: ${d.note}`);
@@ -293,14 +293,10 @@ Use when asked: "How is the Friedrichstr property doing?"`,
           enrichDealsWithStageNames(dealList, pipelines2);
           const totalInquiries = dealsRes.value.meta?.total_count ?? dealList.length;
 
-          const byCategory: Record<string, number> = {};
           const byStage: Record<string, number> = {};
           let totalValue = 0;
 
           for (const d of dealList) {
-            const cat = d.category ?? "unknown";
-            byCategory[cat] = (byCategory[cat] ?? 0) + 1;
-
             const stage = d.deal_stage?.name ?? (d.deal_stage_id ? `Stage #${d.deal_stage_id}` : "No stage");
             byStage[stage] = (byStage[stage] ?? 0) + 1;
 
@@ -313,19 +309,11 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             `Total inquiries: ${totalInquiries}`,
           ];
 
-          if (Object.keys(byCategory).length > 0) {
-            dealLines.push("");
-            dealLines.push("**By category:**");
-            for (const [cat, count] of Object.entries(byCategory)) {
-              dealLines.push(`  ${cat}: ${count}`);
-            }
-          }
-
           if (Object.keys(byStage).length > 0) {
             dealLines.push("");
-            dealLines.push("**By stage ID:**");
+            dealLines.push("**By stage:**");
             for (const [stage, count] of Object.entries(byStage)) {
-              dealLines.push(`  Stage ${stage}: ${count}`);
+              dealLines.push(`  ${stage}: ${count}`);
             }
           }
 
@@ -340,7 +328,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             for (const d of dealList.slice(0, 10)) {
               const cName = d.client ? contactName(d.client) : `Contact #${d.client_id}`;
               const sName = d.deal_stage?.name ?? (d.deal_stage_id ? `#${d.deal_stage_id}` : null);
-              const detail = [sName, d.category].filter(Boolean).join(", ");
+              const detail = sName ?? "";
               dealLines.push(`  • ${cName}${detail ? ` — ${detail}` : ""}`);
             }
           }
