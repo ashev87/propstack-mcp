@@ -194,7 +194,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
           if (activityList.length > 0) {
             const actLines: string[] = [`## Recent Activity (last ${activityList.length})`, ""];
             for (const a of activityList) {
-              actLines.push(`- **${fmt(a.type)}** ${fmt(a.title, "")} — ${fmt(a.created_at)}`);
+              actLines.push(`- **${fmt(a.conversation_type ?? a.type, "—")}** ${fmt(a.title, "")} — ${fmt(a.created_at)}`);
             }
             sections.push(actLines.join("\n"));
           } else {
@@ -346,7 +346,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
 
           const byType: Record<string, number> = {};
           for (const a of activityList) {
-            const t = a.type ?? "unknown";
+            const t = a.conversation_type ?? a.type ?? "unknown";
             byType[t] = (byType[t] ?? 0) + 1;
           }
 
@@ -368,7 +368,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             actLines.push("");
             actLines.push("**Recent:**");
             for (const a of activityList.slice(0, 5)) {
-              actLines.push(`  - ${fmt(a.type)} — ${fmt(a.title, "")} — ${fmt(a.created_at)}`);
+              actLines.push(`  - ${fmt(a.conversation_type ?? a.type, "—")} — ${fmt(a.title, "")} — ${fmt(a.created_at)}`);
             }
           }
 
