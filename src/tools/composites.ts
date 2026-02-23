@@ -12,6 +12,7 @@ import type {
   PropstackPaginatedResponse,
 } from "../types/propstack.js";
 import { textResult, errorResult, fmt, fmtPrice, fmtArea, formatError, stripUndefined, unwrapNumber } from "./helpers.js";
+import { enrichDealsWithStageNames } from "./deals.js";
 
 function daysBetween(from: string, to: Date): number {
   return Math.floor((to.getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
@@ -44,7 +45,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
     },
     async (args) => {
       try {
-        const [contactRes, searchProfilesRes, dealsRes, activitiesRes] = await Promise.allSettled([
+        const [contactRes, searchProfilesRes, dealsRes, activitiesRes, pipelinesRes] = await Promise.allSettled([
           client.get<PropstackContact>(
             `/contacts/${args.contact_id}`,
             { params: { include: "children,documents,relationships,owned_properties", expand: "true" } },
@@ -61,6 +62,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
             "/activities",
             { params: { client_id: args.contact_id, per: 10 } },
           ),
+          client.get<PropstackDealPipeline[]>("/deal_pipelines"),
         ]);
 
         // Contact is essential — if it fails, return error
@@ -160,14 +162,18 @@ need the full picture: "Tell me everything about Herr Weber."`,
         // ── Deals
         if (dealsRes.status === "fulfilled") {
           const dealList = dealsRes.value.data ?? [];
+          // Enrich deals with stage/pipeline names
+          const pipelines = pipelinesRes.status === "fulfilled" ? pipelinesRes.value : [];
+          enrichDealsWithStageNames(dealList, pipelines);
           if (dealList.length > 0) {
             const dealLines: string[] = [`## Deals (${dealList.length})`, ""];
             for (const d of dealList) {
               const propTitle = d.property ? fmt(d.property.title, "Untitled") : `Property #${d.property_id}`;
+              const stageName = d.deal_stage?.name ?? (d.deal_stage_id ? `Stage #${d.deal_stage_id}` : null);
               const parts = [
                 `**Deal #${d.id}**: ${propTitle}`,
-                `  Stage: ${fmt(d.deal_stage_id)} | Category: ${fmt(d.category)}`,
-              ];
+                [stageName, d.category].filter(Boolean).join(" | ") || null,
+              ].filter(Boolean) as string[];
               if (d.sold_price) parts.push(`  Price: ${fmtPrice(d.sold_price)}`);
               if (d.note) parts.push(`  Note: ${d.note}`);
               parts.push(`  Created: ${fmt(d.created_at)}`);
@@ -232,7 +238,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
     },
     async (args) => {
       try {
-        const [propertyRes, dealsRes, activitiesRes] = await Promise.allSettled([
+        const [propertyRes, dealsRes, activitiesRes, pipelinesRes2] = await Promise.allSettled([
           client.get<PropstackProperty>(
             `/units/${args.property_id}`,
             { params: { new: 1, expand: 1 } },
@@ -245,6 +251,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             "/activities",
             { params: { property_id: args.property_id, per: 50 } },
           ),
+          client.get<PropstackDealPipeline[]>("/deal_pipelines"),
         ]);
 
         // Property is essential
@@ -282,6 +289,8 @@ Use when asked: "How is the Friedrichstr property doing?"`,
         // ── Deal/inquiry analysis
         if (dealsRes.status === "fulfilled") {
           const dealList = dealsRes.value.data ?? [];
+          const pipelines2 = pipelinesRes2.status === "fulfilled" ? pipelinesRes2.value : [];
+          enrichDealsWithStageNames(dealList, pipelines2);
           const totalInquiries = dealsRes.value.meta?.total_count ?? dealList.length;
 
           const byCategory: Record<string, number> = {};
@@ -292,7 +301,7 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             const cat = d.category ?? "unknown";
             byCategory[cat] = (byCategory[cat] ?? 0) + 1;
 
-            const stage = String(d.deal_stage_id ?? "unknown");
+            const stage = d.deal_stage?.name ?? (d.deal_stage_id ? `Stage #${d.deal_stage_id}` : "No stage");
             byStage[stage] = (byStage[stage] ?? 0) + 1;
 
             if (d.sold_price) totalValue += d.sold_price;
@@ -330,7 +339,9 @@ Use when asked: "How is the Friedrichstr property doing?"`,
             dealLines.push("**Interested contacts:**");
             for (const d of dealList.slice(0, 10)) {
               const cName = d.client ? contactName(d.client) : `Contact #${d.client_id}`;
-              dealLines.push(`  • ${cName} — Stage: ${fmt(d.deal_stage_id)}, Category: ${fmt(d.category)}`);
+              const sName = d.deal_stage?.name ?? (d.deal_stage_id ? `#${d.deal_stage_id}` : null);
+              const detail = [sName, d.category].filter(Boolean).join(", ");
+              dealLines.push(`  • ${cName}${detail ? ` — ${detail}` : ""}`);
             }
           }
 
@@ -527,7 +538,7 @@ Filter by pipeline_id and/or broker_id. Use when asked:
             const cName = d.client ? contactName(d.client) : `Contact #${d.client_id}`;
             const propTitle = d.property ? fmt(d.property.title, "Untitled") : `Property #${d.property_id}`;
             const daysStale = d.updated_at ? daysBetween(d.updated_at, now) : "?";
-            const stageName = d.deal_stage_id ? (stageNames[d.deal_stage_id] ?? `#${d.deal_stage_id}`) : "none";
+            const stageName = d.deal_stage_id ? (stageNames[d.deal_stage_id] ?? `#${d.deal_stage_id}`) : "No stage";
             staleLines.push(`- **Deal #${d.id}**: ${cName} → ${propTitle} (Stage: ${stageName}, ${daysStale} days since update)`);
           }
           sections.push(staleLines.join("\n"));

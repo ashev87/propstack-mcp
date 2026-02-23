@@ -1,12 +1,39 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
-import type { PropstackDeal, PropstackPaginatedResponse } from "../types/propstack.js";
+import type { PropstackDeal, PropstackDealPipeline, PropstackPaginatedResponse } from "../types/propstack.js";
 import { textResult, errorResult, fmt, fmtPrice, stripUndefined } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
 const FEELING_LABELS = ["none", "cold", "warm", "hot"] as const;
+
+/** Build stage/pipeline name lookup from pipeline definitions and enrich deals in place. */
+export function enrichDealsWithStageNames(deals: PropstackDeal[], pipelines: PropstackDealPipeline[]): void {
+  const stageMap = new Map<number, { name: string; pipeline: string }>();
+  for (const p of pipelines) {
+    const pName = p.name ?? `Pipeline #${p.id}`;
+    if (p.deal_stages) {
+      for (const s of p.deal_stages) {
+        stageMap.set(s.id, { name: s.name ?? `Stage #${s.id}`, pipeline: pName });
+      }
+    }
+  }
+  for (const d of deals) {
+    if (!d.deal_stage && d.deal_stage_id) {
+      const info = stageMap.get(d.deal_stage_id);
+      if (info) {
+        d.deal_stage = { id: d.deal_stage_id, name: info.name, position: null, color: null, chance: null };
+      }
+    }
+    if (!d.deal_pipeline && d.deal_pipeline_id) {
+      const p = pipelines.find((p) => p.id === d.deal_pipeline_id);
+      if (p) {
+        d.deal_pipeline = p;
+      }
+    }
+  }
+}
 
 function formatDeal(d: PropstackDeal): string {
   const clientName = d.client
@@ -17,10 +44,20 @@ function formatDeal(d: PropstackDeal): string {
     ? fmt(d.property.title, "Untitled")
     : `Property #${d.property_id ?? "?"}`;
 
+  const stageName = d.deal_stage
+    ? (d.deal_stage.name ?? `Stage #${d.deal_stage_id}`)
+    : d.deal_stage_id ? `Stage #${d.deal_stage_id}` : null;
+
+  const pipelineName = d.deal_pipeline
+    ? (d.deal_pipeline.name ?? `Pipeline #${d.deal_pipeline_id}`)
+    : d.deal_pipeline_id ? `Pipeline #${d.deal_pipeline_id}` : null;
+
   const lines: (string | null)[] = [
     `**Deal #${d.id}**: ${clientName} → ${propertyTitle}`,
-    `Stage: ${fmt(d.deal_stage_id)} | Pipeline: ${fmt(d.deal_pipeline_id)}`,
-    `Category: ${fmt(d.category)}`,
+    stageName || pipelineName
+      ? [stageName, pipelineName].filter(Boolean).join(" | ")
+      : null,
+    d.category ? `Category: ${d.category}` : null,
     d.sold_price ? `Price: ${fmtPrice(d.sold_price)}` : null,
     d.feeling !== null && d.feeling !== undefined
       ? `Feeling: ${FEELING_LABELS[d.feeling] ?? d.feeling}`
@@ -57,7 +94,16 @@ function formatDealRow(d: PropstackDeal): string {
     ? fmt(d.property.title, "—")
     : String(d.property_id ?? "?");
 
-  return `| ${d.id} | ${clientName} | ${propertyTitle} | ${fmt(d.deal_stage_id)} | ${fmt(d.category)} | ${fmt(d.feeling !== null && d.feeling !== undefined ? (FEELING_LABELS[d.feeling] ?? d.feeling) : null)} | ${fmt(d.created_at)} |`;
+  const stageName = d.deal_stage
+    ? (d.deal_stage.name ?? `#${d.deal_stage_id}`)
+    : d.deal_stage_id ? `#${d.deal_stage_id}` : "—";
+
+  const category = d.category ?? "—";
+  const feeling = d.feeling !== null && d.feeling !== undefined
+    ? (FEELING_LABELS[d.feeling] ?? String(d.feeling))
+    : "—";
+
+  return `| ${d.id} | ${clientName} | ${propertyTitle} | ${stageName} | ${category} | ${feeling} | ${fmt(d.created_at, "—")} |`;
 }
 
 // ── Tool registration ────────────────────────────────────────────────
@@ -142,14 +188,20 @@ Common queries:
     },
     async (args) => {
       try {
-        const res = await client.get<PropstackPaginatedResponse<PropstackDeal>>(
-          "/client_properties",
-          { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
-        );
+        const [res, pipelines] = await Promise.all([
+          client.get<PropstackPaginatedResponse<PropstackDeal>>(
+            "/client_properties",
+            { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
+          ),
+          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+        ]);
 
         if (!res.data || res.data.length === 0) {
           return textResult("No deals found matching your criteria.");
         }
+
+        // Enrich deals with stage/pipeline names from lookup
+        enrichDealsWithStageNames(res.data, pipelines);
 
         const header = res.meta?.total_count !== undefined
           ? `Found ${res.meta.total_count} deals (showing ${res.data.length}):\n\n`
@@ -207,11 +259,15 @@ get_pipeline to find valid pipeline and stage IDs.`,
     },
     async (args) => {
       try {
-        const deal = await client.post<PropstackDeal>(
-          "/client_properties",
-          { body: { client_property: stripUndefined(args) } },
-        );
+        const [deal, pipelines] = await Promise.all([
+          client.post<PropstackDeal>(
+            "/client_properties",
+            { body: { client_property: stripUndefined(args) } },
+          ),
+          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+        ]);
 
+        enrichDealsWithStageNames([deal], pipelines);
         return textResult(`Deal created successfully.\n\n${formatDeal(deal)}`);
       } catch (err) {
         return errorResult("Deal", err);
@@ -263,11 +319,15 @@ Only provide the fields you want to change.`,
     async (args) => {
       try {
         const { id, ...fields } = args;
-        const deal = await client.put<PropstackDeal>(
-          `/client_properties/${id}`,
-          { body: { client_property: stripUndefined(fields) } },
-        );
+        const [deal, pipelines] = await Promise.all([
+          client.put<PropstackDeal>(
+            `/client_properties/${id}`,
+            { body: { client_property: stripUndefined(fields) } },
+          ),
+          client.get<PropstackDealPipeline[]>("/deal_pipelines").catch(() => [] as PropstackDealPipeline[]),
+        ]);
 
+        enrichDealsWithStageNames([deal], pipelines);
         return textResult(`Deal updated successfully.\n\n${formatDeal(deal)}`);
       } catch (err) {
         return errorResult("Deal", err);

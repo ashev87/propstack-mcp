@@ -281,6 +281,8 @@ export interface PropstackDeal {
   // Expanded relations
   client: PropstackContact | null;
   property: PropstackProperty | null;
+  deal_stage: PropstackDealStage | null;
+  deal_pipeline: PropstackDealPipeline | null;
 
   created_at: string | null;
   updated_at: string | null;
