@@ -585,8 +585,10 @@ export interface PropstackEvent {
 
 export interface PropstackWebhook {
   id: number;
-  url: string | null;
-  events: string[] | null;
+  /** API returns `event` (singular string) not `events[]` */
+  event: string | null;
+  /** API returns `target_url` not `url` */
+  target_url: string | null;
   active: boolean | null;
   secret: string | null;
 }

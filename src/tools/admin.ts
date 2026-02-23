@@ -18,18 +18,19 @@ and HMAC secret. Use to review existing automation triggers.`,
     {},
     async () => {
       try {
-        const hooks = await client.get<PropstackWebhook[]>("/hooks");
+        const raw = await client.get<{ hooks: PropstackWebhook[] } | PropstackWebhook[]>("/hooks");
+        const hooks = Array.isArray(raw) ? raw : raw?.hooks ?? [];
 
-        if (!hooks || hooks.length === 0) {
+        if (hooks.length === 0) {
           return textResult("No webhooks configured.");
         }
 
         const lines = hooks.map((h) => {
           const parts: (string | null)[] = [
             `**Webhook #${h.id}**`,
-            `  URL: ${fmt(h.url)}`,
-            `  Events: ${h.events?.join(", ") ?? "none"}`,
-            `  Active: ${h.active ? "yes" : "no"}`,
+            `  URL: ${fmt(h.target_url)}`,
+            `  Event: ${fmt(h.event)}`,
+            `  Active: ${h.active !== false ? "yes" : "no"}`,
             h.secret ? `  Secret: ${h.secret}` : null,
           ];
           return parts.filter(Boolean).join("\n");
@@ -74,9 +75,9 @@ Use this to set up automation triggers, e.g.:
 
         const lines: (string | null)[] = [
           `Webhook created (ID: ${hook.id}).`,
-          `URL: ${fmt(hook.url)}`,
-          `Events: ${hook.events?.join(", ") ?? args.event}`,
-          `Active: ${hook.active ? "yes" : "no"}`,
+          `URL: ${fmt(hook.target_url)}`,
+          `Event: ${fmt(hook.event, args.event)}`,
+          `Active: ${hook.active !== false ? "yes" : "no"}`,
           hook.secret ? `HMAC Secret: ${hook.secret}` : null,
         ];
 
