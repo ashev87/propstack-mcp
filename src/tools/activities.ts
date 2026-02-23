@@ -156,10 +156,11 @@ Events are appointments like property viewings, client meetings,
 notary appointments, etc.
 
 Use this tool to:
-- See what's scheduled this week (starts_at_from/to)
-- List upcoming viewings for a broker
+- See what's scheduled this week (starts_at_after/starts_at_before)
+- List upcoming viewings for a broker (broker=ID)
 - Find cancelled appointments (state="cancelled")
 - Check recurring events
+- Filter by contact (client=ID) or property (property=ID)
 - Answer "what viewings are scheduled this week?"
 
 Event states:
@@ -171,14 +172,26 @@ Event states:
         .describe("Filter for recurring events only"),
       state: z.enum(["neutral", "took_place", "cancelled"]).optional()
         .describe("Event state: neutral (scheduled), took_place, cancelled"),
-      group_id: z.number().optional()
-        .describe("Filter by tag/group ID"),
-      broker_id: z.number().optional()
+      tag: z.number().optional()
+        .describe("Filter by tag/group ID (Merkmal)"),
+      broker: z.number().optional()
         .describe("Filter by broker ID"),
-      starts_at_from: z.string().optional()
-        .describe("Events starting after this date/time (ISO 8601)"),
-      starts_at_to: z.string().optional()
-        .describe("Events starting before this date/time (ISO 8601)"),
+      client: z.number().optional()
+        .describe("Filter by contact ID"),
+      property: z.number().optional()
+        .describe("Filter by property ID"),
+      project: z.number().optional()
+        .describe("Filter by project ID"),
+      note_type: z.number().optional()
+        .describe("Filter by event category/type ID"),
+      starts_at_after: z.string().optional()
+        .describe("Events starting after this date/time (ISO 8601, e.g. '2025-01-01')"),
+      starts_at_before: z.string().optional()
+        .describe("Events starting before this date/time (ISO 8601, e.g. '2025-12-31')"),
+      ends_at_after: z.string().optional()
+        .describe("Events ending after this date/time (ISO 8601)"),
+      ends_at_before: z.string().optional()
+        .describe("Events ending before this date/time (ISO 8601)"),
       page: z.number().optional()
         .describe("Page number (default: 1)"),
       per_page: z.number().optional()
