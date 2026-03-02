@@ -319,3 +319,7 @@ src/
 ## License
 
 MIT
+
+<a href="https://glama.ai/mcp/servers/@ashev87/propstack-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ashev87/propstack-mcp/badge" />
+</a>
