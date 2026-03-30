@@ -17,6 +17,10 @@ Connect AI assistants (Claude, ChatGPT) to your Propstack real estate CRM.
 - **Lead intake** — one-call workflow: dedup, create contact, log notes, create deal, set reminder
 - **Bulk export** — full data dumps for reporting, backup, or migration
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/ashev87-propstack-mcp).
+
 ## Quick Start
 
 ### 1. Set your API key
