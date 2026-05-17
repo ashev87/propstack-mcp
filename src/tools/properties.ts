@@ -2,9 +2,38 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackProperty, PropstackPropertyStatus, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, fmtPrice, fmtArea, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, fmtArea, stripUndefined, unwrapPropstackValue } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
+
+function fmtList(value: unknown): string {
+  const v = unwrapPropstackValue(value);
+  if (Array.isArray(v)) {
+    const items = v.map((item) => fmt(item, "")).filter(Boolean);
+    return items.length > 0 ? items.join(", ") : "none";
+  }
+  return fmt(v);
+}
+
+function fmtYesNo(value: unknown): string {
+  const v = unwrapPropstackValue(value);
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  return fmt(v);
+}
+
+function formatSection(
+  title: string,
+  rows: Array<[label: string, value: unknown, formatter?: (value: unknown) => string]>,
+): string | null {
+  const lines = rows
+    .map(([label, value, formatter = fmt]) => {
+      const formatted = formatter(value);
+      return formatted === "none" ? null : `  - ${label}: ${formatted}`;
+    })
+    .filter((line): line is string => line !== null);
+
+  return lines.length > 0 ? `${title}:\n${lines.join("\n")}` : null;
+}
 
 function formatProperty(p: PropstackProperty): string {
   const title = fmt(p.title, "Untitled");
@@ -35,7 +64,60 @@ function formatProperty(p: PropstackProperty): string {
     p.project ? `Project: ${fmt(p.project.name)}` : null,
     p.exposee_id ? `Exposé ID: ${p.exposee_id}` : null,
   ];
-  return lines.filter(Boolean).join("\n");
+
+  const details = [
+    formatSection("Energy certificate", [
+      ["Availability", p.energy_certificate_availability],
+      ["Rating type", p.building_energy_rating_type],
+      ["Efficiency class", p.energy_efficiency_class],
+      ["Thermal characteristic", p.thermal_characteristic],
+      ["Electricity portion", p.thermal_characteristic_electricity],
+      ["Heating portion", p.thermal_characteristic_heating],
+      ["Warm water included", p.energy_consumption_contains_warm_water, fmtYesNo],
+      ["Certificate start", p.energy_certificate_start_date],
+      ["Certificate end", p.energy_certificate_end_date],
+      ["Heating type", p.heating_type],
+      ["Firing types", p.firing_types, fmtList],
+    ]),
+    formatSection("Equipment", [
+      ["Lift", p.lift, fmtYesNo],
+      ["Cellar", p.cellar, fmtYesNo],
+      ["Barrier free", p.barrier_free, fmtYesNo],
+      ["Guest toilet", p.guest_toilet, fmtYesNo],
+      ["Built-in kitchen", p.built_in_kitchen, fmtYesNo],
+      ["Balcony", p.balcony, fmtYesNo],
+      ["Garden", p.garden, fmtYesNo],
+      ["Terrace", p.terrace, fmtYesNo],
+      ["Monument", p.monument, fmtYesNo],
+    ]),
+    formatSection("Layout and condition", [
+      ["Floors", p.number_of_floors],
+      ["Balconies", p.number_of_balconies],
+      ["Terraces", p.number_of_terraces],
+      ["Parking spaces", p.number_of_parking_spaces],
+      ["Floor label", p.floor_label],
+      ["Parking space type", p.parking_space_type],
+      ["Last refurbishment", p.last_refurbishment],
+      ["Condition", p.condition],
+      ["Interior quality", p.interior_quality],
+      ["Technical modernization year", p.equipment_technology_construction_year],
+    ]),
+    formatSection("Marketing and costs", [
+      ["Service charge", p.service_charge, fmtPrice],
+      ["Heating costs", p.heating_costs, fmtPrice],
+      ["Parking space price", p.parking_space_price, fmtPrice],
+      ["Deposit", p.deposit],
+      ["Sold price", p.sold_price, fmtPrice],
+      ["Sold date", p.sold_date],
+      ["Usable floor space", p.usable_floor_space, fmtArea],
+      ["Total floor space", p.total_floor_space, fmtArea],
+      ["Balcony space", p.balcony_space, fmtArea],
+      ["Free from", p.free_from],
+      ["Rented", p.rented, fmtYesNo],
+    ]),
+  ].filter(Boolean);
+
+  return [...lines.filter(Boolean), ...details].join("\n");
 }
 
 function formatPropertyRow(p: PropstackProperty): string {
@@ -72,6 +154,73 @@ const SEARCH_SORT_FIELDS = [
   "street_number.raw", "sold_date", "total_rent", "number_of_rooms",
   "updated_at",
 ] as const;
+
+const GERMAN_RESIDENTIAL_PROPERTY_FIELDS = {
+  // Energy certificate
+  energy_certificate_availability: z.string().optional()
+    .describe("Energy certificate availability/exemption status"),
+  building_energy_rating_type: z.string().optional()
+    .describe("Energy rating type, e.g. Bedarfsausweis or Verbrauchsausweis"),
+  energy_efficiency_class: z.string().optional()
+    .describe("Energy efficiency class, e.g. A+, A, B, C, D, E, F, G, H"),
+  thermal_characteristic: z.number().optional()
+    .describe("Final energy demand/consumption in kWh/(m²·a)"),
+  thermal_characteristic_electricity: z.number().optional()
+    .describe("Electricity portion of the energy characteristic"),
+  thermal_characteristic_heating: z.number().optional()
+    .describe("Heating portion of the energy characteristic"),
+  energy_consumption_contains_warm_water: z.boolean().optional()
+    .describe("Whether energy consumption includes domestic hot water"),
+  energy_certificate_start_date: z.string().optional()
+    .describe("Energy certificate issue/start date"),
+  energy_certificate_end_date: z.string().optional()
+    .describe("Energy certificate expiry/end date"),
+  heating_type: z.string().optional()
+    .describe("Heating system type"),
+  firing_types: z.union([z.string(), z.array(z.string())]).optional()
+    .describe("Energy carrier/firing type or types"),
+
+  // Standard residential equipment
+  lift: z.boolean().optional().describe("Elevator available"),
+  cellar: z.boolean().optional().describe("Basement/cellar available"),
+  barrier_free: z.boolean().optional().describe("Barrier-free / accessible"),
+  guest_toilet: z.boolean().optional().describe("Guest toilet available"),
+  built_in_kitchen: z.boolean().optional().describe("Built-in kitchen available"),
+  balcony: z.boolean().optional().describe("Balcony available"),
+  garden: z.boolean().optional().describe("Garden available"),
+  terrace: z.boolean().optional().describe("Terrace available"),
+  monument: z.boolean().optional().describe("Listed-building / monument status"),
+
+  // Layout and condition
+  number_of_floors: z.number().optional().describe("Total number of floors in the building"),
+  number_of_balconies: z.number().optional().describe("Number of balconies"),
+  number_of_terraces: z.number().optional().describe("Number of terraces"),
+  number_of_parking_spaces: z.number().optional().describe("Number of parking spaces"),
+  floor_label: z.string().optional().describe("Floor label, e.g. '5. OG'"),
+  parking_space_type: z.string().optional().describe("Parking space type, e.g. garage, carport, outdoor"),
+  last_refurbishment: z.number().optional().describe("Year of last refurbishment"),
+  condition: z.string().optional().describe("Property condition"),
+  interior_quality: z.string().optional().describe("Interior quality"),
+  equipment_technology_construction_year: z.number().optional()
+    .describe("Year of last technical modernization"),
+
+  // Costs, areas, availability, and long-form marketing text
+  service_charge: z.number().optional().describe("Monthly service charge / Hausgeld"),
+  heating_costs: z.number().optional().describe("Heating cost component"),
+  parking_space_price: z.number().optional().describe("Parking space price"),
+  deposit: z.union([z.string(), z.number()]).optional().describe("Security deposit"),
+  sold_price: z.number().optional().describe("Realized sale price"),
+  sold_date: z.string().optional().describe("Sale date"),
+  usable_floor_space: z.number().optional().describe("Usable floor space (m²)"),
+  total_floor_space: z.number().optional().describe("Total floor space (m²)"),
+  balcony_space: z.number().optional().describe("Balcony area (m²)"),
+  free_from: z.string().optional().describe("Availability date or free-from text"),
+  rented: z.boolean().optional().describe("Whether the property is currently rented"),
+  long_description_note: z.string().optional().describe("Long portal-specific description"),
+  long_location_note: z.string().optional().describe("Long portal-specific location text"),
+  long_furnishing_note: z.string().optional().describe("Long portal-specific furnishing text"),
+  long_other_note: z.string().optional().describe("Long portal-specific miscellaneous text"),
+} as const;
 
 // ── Tool registration ────────────────────────────────────────────────
 
@@ -240,6 +389,14 @@ Always fetches with new=1 (extra fields) and expand=1 (custom fields).`,
         if (furn) descriptions.push(`**Furnishing:** ${furn}`);
         const other = fmt(property.other_note, "");
         if (other) descriptions.push(`**Other:** ${other}`);
+        const longDesc = fmt(property.long_description_note, "");
+        if (longDesc) descriptions.push(`**Long description:** ${longDesc}`);
+        const longLoc = fmt(property.long_location_note, "");
+        if (longLoc) descriptions.push(`**Long location:** ${longLoc}`);
+        const longFurn = fmt(property.long_furnishing_note, "");
+        if (longFurn) descriptions.push(`**Long furnishing:** ${longFurn}`);
+        const longOther = fmt(property.long_other_note, "");
+        if (longOther) descriptions.push(`**Long other:** ${longOther}`);
         if (descriptions.length > 0) {
           result += "\n\n" + descriptions.join("\n\n");
         }
@@ -337,6 +494,7 @@ rs_category provides sub-types (e.g. PENTHOUSE, VILLA, MAISONETTE for APARTMENT/
       // Commission
       courtage: z.string().optional().describe("Commission amount or percentage"),
       courtage_note: z.string().optional().describe("Commission details/notes"),
+      ...GERMAN_RESIDENTIAL_PROPERTY_FIELDS,
       // Assignment
       broker_id: z.number().optional().describe("Assigned broker ID"),
       project_id: z.number().optional().describe("Project ID this property belongs to"),
@@ -410,6 +568,7 @@ Use get_property_statuses to look up valid status IDs.`,
       other_note: z.string().optional().describe("Additional notes text"),
       courtage: z.string().optional().describe("Commission amount or percentage"),
       courtage_note: z.string().optional().describe("Commission details"),
+      ...GERMAN_RESIDENTIAL_PROPERTY_FIELDS,
       broker_id: z.number().optional().describe("Assigned broker ID"),
       project_id: z.number().optional().describe("Project ID"),
       status: z.number().optional().describe("Property status ID (use get_property_statuses)"),
