@@ -144,9 +144,9 @@ Get your Propstack API key:
 | Tool | Description |
 |---|---|
 | `search_properties` | Search properties with 11 range filters, 17 sort fields |
-| `get_property` | Get full property details including media and custom fields |
-| `create_property` | Create a new property listing |
-| `update_property` | Update price, status, description, broker assignment |
+| `get_property` | Get full property details including media, custom fields, energy certificate, equipment, layout, cost, and marketing fields |
+| `create_property` | Create a new property listing, including German residential exposé fields |
+| `update_property` | Update price, status, description, broker assignment, and German residential exposé fields |
 | `get_property_statuses` | List property statuses (Verfuegbar, Reserviert, Verkauft, etc.) |
 
 ### Tasks (Aufgaben & Notizen)
