@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackDeal, PropstackDealPipeline, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, fmtPrice, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, stripUndefined, validateFields, renderProjectedRecord, DEAL_FIELDS } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -137,7 +137,12 @@ Common queries:
 - All active deals: category="qualified"
 - Lost deals this month: category="lost" + created_at_from
 - Deals for a property: property_id=123
-- Pipeline view: deal_pipeline_id + sort_by=deal_stage_id`,
+- Pipeline view: deal_pipeline_id + sort_by=deal_stage_id
+
+Data minimization (Art. 25 DSGVO): pass 'fields' with an array of deal field
+names to return only those fields per deal (e.g. ["id", "deal_stage_id",
+"sold_price"]). Omit 'fields' to return the default set unchanged. Unknown
+field names produce an error listing the valid options.`,
     {
       client_id: z.number().optional()
         .describe("Filter by contact ID"),
@@ -189,13 +194,21 @@ Common queries:
         .describe("Page number (default: 1)"),
       per_page: z.number().optional()
         .describe("Results per page (default: 25)"),
+      fields: z.array(z.string()).optional()
+        .describe("Data minimization: return only these deal fields per result (e.g. [\"id\", \"deal_stage_id\", \"sold_price\"]). Omit to return the default field set. Unknown field names produce an error."),
     },
     async (args) => {
       try {
+        if (args.fields && args.fields.length > 0) {
+          const fieldError = validateFields(args.fields, DEAL_FIELDS, "deal");
+          if (fieldError) return textResult(fieldError);
+        }
+
+        const { fields, ...apiArgs } = args;
         const [res, pipelines] = await Promise.all([
           client.get<PropstackPaginatedResponse<PropstackDeal>>(
             "/client_properties",
-            { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
+            { params: apiArgs as Record<string, string | number | boolean | string[] | number[] | undefined> },
           ),
           fetchPipelines(client).catch(() => [] as PropstackDealPipeline[]),
         ]);
@@ -210,6 +223,13 @@ Common queries:
         const header = res.meta?.total_count !== undefined
           ? `Found ${res.meta.total_count} deals (showing ${res.data.length}):\n\n`
           : `Found ${res.data.length} deals:\n\n`;
+
+        if (fields && fields.length > 0) {
+          const projected = res.data
+            .map((d) => renderProjectedRecord(d as unknown as Record<string, unknown>, fields, `**ID: ${d.id}**`))
+            .join("\n\n---\n\n");
+          return textResult(header + projected);
+        }
 
         const table = [
           "| ID | Contact | Property | Stage | Feeling | Created |",

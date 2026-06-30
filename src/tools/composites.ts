@@ -11,7 +11,7 @@ import type {
   PropstackTask,
   PropstackPaginatedResponse,
 } from "../types/propstack.js";
-import { textResult, errorResult, fmt, fmtPrice, fmtArea, formatError, stripUndefined, unwrapNumber } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, fmtArea, formatError, stripUndefined, unwrapNumber, validateFields, renderFieldValue, CONTACT_FIELDS } from "./helpers.js";
 import { enrichDealsWithStageNames, fetchPipelines } from "./deals.js";
 
 function daysBetween(from: string, to: Date): number {
@@ -38,13 +38,26 @@ Combines 4 API calls in parallel:
 - Recent activity (last 10 interactions)
 
 Returns a complete contact dossier in one request. Use this when you
-need the full picture: "Tell me everything about Herr Weber."`,
+need the full picture: "Tell me everything about Herr Weber."
+
+Data minimization (Art. 25 DSGVO): pass 'fields' with an array of contact
+field names to limit the contact detail section to only those fields (e.g.
+["first_name", "last_name", "email"]). The search profiles, deals, and
+activity sections are unaffected. Omit 'fields' for the full detail section.
+Unknown field names produce an error listing the valid options.`,
     {
       contact_id: z.number()
         .describe("Contact ID to get 360° view for"),
+      fields: z.array(z.string()).optional()
+        .describe("Data minimization: limit the contact detail section to only these contact fields (e.g. [\"first_name\", \"last_name\", \"email\"]). Omit for the full detail section. Unknown field names produce an error."),
     },
     async (args) => {
       try {
+        if (args.fields && args.fields.length > 0) {
+          const fieldError = validateFields(args.fields, CONTACT_FIELDS, "contact");
+          if (fieldError) return textResult(fieldError);
+        }
+
         const [contactRes, searchProfilesRes, dealsRes, activitiesRes, pipelinesRes] = await Promise.allSettled([
           client.get<PropstackContact>(
             `/contacts/${args.contact_id}`,
@@ -76,6 +89,16 @@ need the full picture: "Tell me everything about Herr Weber."`,
 
         // ── Personal info
         const name = contactName(contact);
+
+        if (args.fields && args.fields.length > 0) {
+          // Data minimization: emit only the requested contact fields.
+          const record = contact as unknown as Record<string, unknown>;
+          const fieldLines = [`# ${name} (ID: ${contact.id})`, ""];
+          for (const f of args.fields) {
+            fieldLines.push(`${f}: ${renderFieldValue(record[f])}`);
+          }
+          sections.push(fieldLines.join("\n"));
+        } else {
         const personalLines: (string | null)[] = [
           `# ${name} (ID: ${contact.id})`,
           "",
@@ -124,6 +147,7 @@ need the full picture: "Tell me everything about Herr Weber."`,
         }
 
         sections.push(personalLines.filter((l) => l !== null).join("\n"));
+        }
 
         // ── Search profiles
         if (searchProfilesRes.status === "fulfilled") {

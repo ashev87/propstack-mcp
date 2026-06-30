@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackContact, PropstackContactSource, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, stripUndefined, validateFields, renderProjectedRecord, applyCustomFilters, CONTACT_FIELDS } from "./helpers.js";
 
 /**
  * Generate search variants for a phone number. Propstack normalizes spaces/dashes
@@ -85,7 +85,17 @@ Phone search ('phone_number') ignores formatting — both 015712345678
 and 0157-123-456-78 will match.
 
 Returns paginated results. Use expand=true for full details including
-custom fields.`,
+custom fields.
+
+Custom fields: pass 'custom_filters' as an object of custom-field-name →
+value to filter by agency-specific fields (use list_custom_fields to
+discover field names). Each entry becomes a cf_<name> query parameter,
+e.g. { marketing_channel: "Website" }.
+
+Data minimization (Art. 25 DSGVO): pass 'fields' with an array of contact
+field names to return only those fields per contact (e.g. ["first_name",
+"last_name", "email"]). Omit 'fields' to return the default set unchanged.
+Unknown field names produce an error listing the valid options.`,
     {
       q: z.string().optional()
         .describe("Fulltext search across name, email, address, phone"),
@@ -139,12 +149,26 @@ custom fields.`,
         .describe("Page number (default: 1)"),
       per_page: z.number().optional()
         .describe("Results per page (default: 25)"),
+      custom_filters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
+        .describe("Filter by custom field values. Keys are custom field names WITHOUT the cf_ prefix (use list_custom_fields to discover them); each becomes a cf_<name>=<value> query parameter. Example: { marketing_channel: \"Website\" }"),
+      fields: z.array(z.string()).optional()
+        .describe("Data minimization: return only these contact fields per result (e.g. [\"first_name\", \"last_name\", \"email\"]). Omit to return the default field set. Unknown field names produce an error."),
     },
     async (args) => {
       try {
+        if (args.fields && args.fields.length > 0) {
+          const fieldError = validateFields(args.fields, CONTACT_FIELDS, "contact");
+          if (fieldError) return textResult(fieldError);
+        }
+
+        const { fields, custom_filters, ...apiArgs } = args;
+        const params = applyCustomFilters(
+          apiArgs as Record<string, string | number | boolean | string[] | number[] | undefined>,
+          custom_filters,
+        );
         const raw = await client.get<PropstackPaginatedResponse<PropstackContact> | PropstackContact[]>(
           "/contacts",
-          { params: args as Record<string, string | number | boolean | string[] | number[] | undefined> },
+          { params },
         );
         const res = normalizeContactsResponse(raw);
 
@@ -155,6 +179,13 @@ custom fields.`,
         const header = res.meta?.total_count !== undefined
           ? `Found ${res.meta.total_count} contacts (showing ${res.data.length}):\n\n`
           : `Found ${res.data.length} contacts:\n\n`;
+
+        if (fields && fields.length > 0) {
+          const projected = res.data
+            .map((c) => renderProjectedRecord(c as unknown as Record<string, unknown>, fields, `**ID: ${c.id}**`))
+            .join("\n\n---\n\n");
+          return textResult(header + projected);
+        }
 
         const formatted = res.data.map(formatContact).join("\n\n---\n\n");
         return textResult(header + formatted);

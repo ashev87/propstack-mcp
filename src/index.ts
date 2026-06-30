@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PropstackClient } from "./propstack-client.js";
+
+// Single source of truth for the version advertised to MCP clients.
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 import { registerContactTools } from "./tools/contacts.js";
 import { registerPropertyTools } from "./tools/properties.js";
 import { registerTaskTools } from "./tools/tasks.js";
@@ -30,7 +35,7 @@ const client = new PropstackClient(PROPSTACK_API_KEY);
 const server = new McpServer(
   {
     name: "propstack-mcp-server",
-    version: "0.1.0",
+    version,
   },
   {
     capabilities: {

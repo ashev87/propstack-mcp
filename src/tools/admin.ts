@@ -109,52 +109,6 @@ Removes the webhook so Propstack will stop sending events to its URL.`,
     },
   );
 
-  // ── export_data ─────────────────────────────────────────────────
-
-  server.tool(
-    "export_data",
-    `Bulk export an entire data table from Propstack as JSON.
-
-Useful for reporting, backup, migration, or analytics. Returns the
-full contents of the selected table.
-
-Available tables:
-- Core: contacts, properties, projects, deals, saved_queries
-- Activities: appointments, todos, notes, messages, cancelations
-- Media: documents, images
-- Organization: brokers, teams, departments, commission_splits
-- Config: deal_pipelines, policies, relationships, property_details
-- Lookup: groups, contact_sources, contact_reasons, contact_statuses,
-  reservation_reasons, property_statuses`,
-    {
-      table: z.enum([
-        "appointments", "brokers", "cancelations", "commission_splits",
-        "contacts", "deal_pipelines", "deals", "departments",
-        "documents", "images", "messages", "notes",
-        "policies", "projects", "properties", "property_details",
-        "relationships", "saved_queries", "teams", "todos",
-        "groups", "contact_sources", "contact_reasons", "contact_statuses",
-        "reservation_reasons", "property_statuses",
-      ])
-        .describe("Table name to export"),
-    },
-    async (args) => {
-      try {
-        const data = await client.get<unknown>(
-          `/datadump/${args.table}`,
-        );
-
-        if (Array.isArray(data)) {
-          return textResult(`Exported ${data.length} rows from "${args.table}".\n\n${JSON.stringify(data, null, 2)}`);
-        }
-
-        return textResult(`Export of "${args.table}":\n\n${JSON.stringify(data, null, 2)}`);
-      } catch (err) {
-        return errorResult("Data export", err);
-      }
-    },
-  );
-
   // ── get_contact_favorites ───────────────────────────────────────
 
   server.tool(
