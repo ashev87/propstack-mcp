@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ashev87/propstack-mcp",
-  "description": "MCP server for Propstack real estate CRM — connect AI assistants to your Propstack data (contacts, properties, deals, search profiles, tasks, email).",
+  "description": "Connect AI assistants to your Propstack real estate CRM (contacts, properties, deals).",
   "repository": {
     "url": "https://github.com/ashev87/propstack-mcp",
     "source": "github"
