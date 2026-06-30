@@ -58,6 +58,9 @@ export function formatError(err: unknown): string {
         return `Propstack API error ${err.status}: ${err.detail}`;
     }
   }
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return "Request to Propstack API timed out after multiple attempts. Please try again in a moment.";
+  }
   if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("ECONNREFUSED") || err.message.includes("ENOTFOUND"))) {
     return `Network error: could not reach Propstack API. Check your internet connection. (${err.message})`;
   }
@@ -165,4 +168,120 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): Parti
     }
   }
   return result as Partial<T>;
+}
+
+// ── Field selection (data minimization, Art. 25 DSGVO) ────────────────
+//
+// Bulk-data tools accept an optional `fields` whitelist so a controller can
+// request only the fields they need. These arrays are the known, selectable
+// field names per entity type — they mirror the interfaces in
+// types/propstack.ts and are used to validate the `fields` parameter so
+// unknown names fail loudly instead of being silently dropped.
+
+export const CONTACT_FIELDS = [
+  "id", "name", "first_name", "last_name", "salutation", "email", "phone",
+  "home_cell", "home_phone", "office_phone", "fax", "company", "position",
+  "description", "home_street", "home_house_number", "home_zip_code",
+  "home_city", "home_country", "office_street", "office_house_number",
+  "office_zip_code", "office_city", "office_country", "broker_id", "broker",
+  "client_source_id", "client_source", "client_status_id", "client_status",
+  "status", "language", "rating", "newsletter", "accept_contact",
+  "gdpr_status", "warning_notice", "groups", "custom_fields",
+  "last_contact_at", "last_contact_at_formatted", "created_at", "updated_at",
+  "archived", "children", "documents", "relationships", "owned_properties",
+  "old_crm_id",
+] as const;
+
+export const PROPERTY_FIELDS = [
+  "id", "title", "unit_id", "exposee_id", "marketing_type", "object_type",
+  "rs_type", "rs_category", "street", "house_number", "zip_code", "city",
+  "country", "lat", "lng", "price", "base_rent", "total_rent", "living_space",
+  "plot_area", "property_space_value", "number_of_rooms",
+  "number_of_bed_rooms", "number_of_bath_rooms", "floor", "construction_year",
+  "description_note", "location_note", "furnishing_note", "other_note",
+  "courtage", "courtage_note", "broker_id", "broker", "project_id", "project",
+  "status", "property_status", "property_groups", "custom_fields", "images",
+  "floorplans", "documents", "links", "created_at", "updated_at", "archived",
+] as const;
+
+export const DEAL_FIELDS = [
+  "id", "broker_id", "client_id", "property_id", "project_id", "deal_stage_id",
+  "deal_pipeline_id", "sold_price", "note", "date", "start_date",
+  "reservation_reason_id", "feeling", "category", "client", "property",
+  "deal_stage", "deal_pipeline", "created_at", "updated_at",
+] as const;
+
+/**
+ * Validate a requested `fields` list against a known field set. Returns a
+ * clear, user-facing error message if any field is unknown, or null if all
+ * requested fields are valid. Unknown fields are reported by name alongside
+ * the full list of valid options — never silently ignored.
+ */
+export function validateFields(
+  requested: readonly string[],
+  known: readonly string[],
+  entityLabel: string,
+): string | null {
+  const knownSet = new Set(known);
+  const unknown = requested.filter((f) => !knownSet.has(f));
+  if (unknown.length === 0) return null;
+  const plural = unknown.length === 1 ? "field" : "fields";
+  return (
+    `Unknown ${entityLabel} ${plural}: ${unknown.join(", ")}. ` +
+    `Valid ${entityLabel} fields are: ${known.join(", ")}.`
+  );
+}
+
+/**
+ * Render a single (possibly nested) field value for projected output.
+ * Unwraps Propstack scalar wrappers and name/label objects where possible
+ * for readability; renders genuine nested objects/arrays as JSON so no data
+ * is lost.
+ */
+export function renderFieldValue(value: unknown): string {
+  if (value !== null && typeof value === "object") {
+    const unwrapped = unwrapPropstackValue(value);
+    if (typeof unwrapped !== "object" || unwrapped === null) {
+      return unwrapped === null || unwrapped === undefined || unwrapped === ""
+        ? "none"
+        : String(unwrapped);
+    }
+    return JSON.stringify(value);
+  }
+  return value === null || value === undefined || value === "" ? "none" : String(value);
+}
+
+/**
+ * Project a record to only the requested fields and render it as a markdown
+ * block. `header` identifies the record (e.g. its ID). Used by bulk tools
+ * when a `fields` whitelist is supplied.
+ */
+export function renderProjectedRecord(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+  header: string,
+): string {
+  const lines = [header, ...fields.map((f) => `${f}: ${renderFieldValue(record[f])}`)];
+  return lines.join("\n");
+}
+
+type QueryParams = Record<string, string | number | boolean | string[] | number[] | undefined>;
+
+/**
+ * Expand a custom-field filter map into `cf_<name>` query parameters and
+ * merge it into the given params. Field names are taken as-is (the cf_
+ * prefix is added if missing), so the caller passes plain custom field
+ * names from list_custom_fields. Returns a new object; params is not mutated.
+ */
+export function applyCustomFilters(
+  params: QueryParams,
+  customFilters: Record<string, string | number | boolean> | undefined,
+): QueryParams {
+  if (!customFilters) return params;
+  const out: QueryParams = { ...params };
+  for (const [key, value] of Object.entries(customFilters)) {
+    const cfKey = key.startsWith("cf_") ? key : `cf_${key}`;
+    out[cfKey] = value;
+  }
+  return out;
 }

@@ -15,7 +15,8 @@ Connect AI assistants (Claude, ChatGPT) to your Propstack real estate CRM.
 - **360-degree contact view** — get a complete briefing before every call
 - **Pipeline dashboards** — deal counts and values per stage, stale deal alerts
 - **Lead intake** — one-call workflow: dedup, create contact, log notes, create deal, set reminder
-- **Bulk export** — full data dumps for reporting, backup, or migration
+
+> **Data protection (DSGVO):** Using this server sends personal data from your Propstack CRM into the LLM you connect (Claude, ChatGPT, …). You — the Propstack customer — remain the data controller. See [Datenschutz (DSGVO)](#datenschutz-dsgvo) for responsibility, legal basis, the `fields` data-minimization parameter, and notes on automated decisions.
 
 ## Quick Start
 
@@ -125,13 +126,13 @@ Get your Propstack API key:
 
 > **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
 
-## Available Tools (50)
+## Available Tools (49)
 
 ### Contacts (Kontakte)
 
 | Tool | Description |
 |---|---|
-| `search_contacts` | Search and filter contacts by name, email, phone, status, tags, broker, GDPR status |
+| `search_contacts` | Search and filter contacts by name, email, phone, status, tags, broker, GDPR status, custom fields |
 | `get_contact` | Get full details of a single contact with related data |
 | `create_contact` | Create a new contact (auto-dedup by email) |
 | `update_contact` | Update contact details, tags, GDPR status, broker assignment |
@@ -143,7 +144,7 @@ Get your Propstack API key:
 
 | Tool | Description |
 |---|---|
-| `search_properties` | Search properties with 11 range filters, 17 sort fields |
+| `search_properties` | Search properties with 11 range filters, 17 sort fields, custom-field filters |
 | `get_property` | Get full property details including media and custom fields |
 | `create_property` | Create a new property listing |
 | `update_property` | Update price, status, description, broker assignment |
@@ -242,7 +243,6 @@ Get your Propstack API key:
 | `list_webhooks` | List all configured webhook subscriptions |
 | `create_webhook` | Subscribe to CRM events (CLIENT_CREATED, PROPERTY_UPDATED, etc.) |
 | `delete_webhook` | Remove a webhook subscription |
-| `export_data` | Bulk export an entire data table as JSON |
 | `get_contact_favorites` | Get properties a contact has favorited |
 
 ## Example Conversations / Beispiel-Konversationen
@@ -280,6 +280,36 @@ Get your Propstack API key:
 > **Du:** Gib mir alles ueber Kontakt 3847 — ich rufe gleich an.
 >
 > **KI:** *ruft `full_contact_360` auf* — Herr Weber, Rating 3 Sterne, sucht 3-Zimmer in Berlin/Potsdam bis 400k. 2 aktive Deals, letzte Aktivitaet vor 3 Tagen...
+
+## Datenschutz (DSGVO)
+
+> **English summary:** Using this MCP server sends personal data from your Propstack CRM into whichever LLM you connect. You (the Propstack customer) are the data controller (Verantwortlicher) under Art. 4(7) GDPR — the tool author hosts and processes nothing. The German section below covers controller responsibility, the legal basis your LLM processing needs, the `fields` parameter for data minimization, automated-decision notes for `match_contacts_to_property`, and audit logging. These points apply to any LLM tool handling customer data; they are stated here because they are easy to overlook.
+
+### Verantwortlichkeit
+
+Dies ist ein quelloffenes Werkzeug (Open Source). Jeder Nutzer verbindet es über seinen eigenen API-Schluessel mit seinem eigenen Propstack-Konto. Der Server ist zustandslos, laeuft lokal beim jeweiligen Nutzer und speichert keine Daten. Es werden keine Daten durch den Autor des Werkzeugs gehostet oder verarbeitet. Der Propstack-Kunde, der dieses Werkzeug einsetzt, ist der **Verantwortliche** im Sinne von Art. 4 Nr. 7 DSGVO.
+
+### Verarbeitung durch das LLM
+
+Bei der Nutzung dieses Werkzeugs werden personenbezogene Daten (Namen, Adressen, Kontaktdaten sowie je nach Tool auch Finanz- bzw. Deal-Daten) in das Kontextfenster des jeweils verbundenen LLM (Claude, ChatGPT usw.) uebertragen. Dies stellt einen **Verarbeitungsvorgang** im Sinne von Art. 4 Nr. 2 DSGVO dar. Der Verantwortliche benoetigt hierfuer:
+
+- eine **Rechtsgrundlage** nach Art. 6 DSGVO,
+- eine entsprechende Angabe in der eigenen **Datenschutzerklaerung** (Transparenzpflichten nach Art. 13/14 DSGVO gegenueber den betroffenen Personen),
+- gegebenenfalls einen **Auftragsverarbeitungsvertrag (AVV)** mit dem LLM-Anbieter.
+
+Dies gilt fuer jedes LLM-gestuetzte Werkzeug, das Kundendaten verarbeitet, und ist nicht spezifisch fuer diesen MCP-Server — es wird hier dennoch ausdruecklich genannt, da es leicht uebersehen wird.
+
+### Hinweis zu automatisierten Entscheidungen (`match_contacts_to_property`)
+
+Das Tool `match_contacts_to_property` erzeugt einen Uebereinstimmungs-Score (Ranking) zwischen Kontakten und einem Objekt — zur Vorlage fuer eine menschliche Pruefung. Es ist als **Entscheidungsunterstuetzung** konzipiert, nicht als autonomer Entscheider: Der Makler prueft die Ergebnisse und handelt manuell. Dadurch faellt die Nutzung nicht unter Art. 22 DSGVO (der ausschliesslich automatisierte Entscheidungen mit rechtlicher oder aehnlich erheblicher Wirkung betrifft). Der Verantwortliche sollte jedoch sicherstellen, dass das Tool auch tatsaechlich so eingesetzt wird — also nicht ohne menschliche Pruefung in eine vollstaendig automatisierte Ansprache eingebunden wird.
+
+### Datenminimierung (`fields`-Parameter)
+
+Die Tools, die personenbezogene Daten in groesserem Umfang zurueckgeben — `search_contacts`, `search_properties`, `search_deals` und `full_contact_360` — unterstuetzen einen optionalen `fields`-Parameter. Damit lassen sich gezielt nur die benoetigten Felder abrufen (z. B. `["first_name", "last_name", "email"]`). Ohne `fields` bleibt das Verhalten unveraendert (alle Felder werden zurueckgegeben). Es wird empfohlen, dass Verantwortliche `fields` nutzen, um nur die fuer den jeweiligen Zweck erforderlichen Daten zu verarbeiten — im Sinne von **Datenschutz durch Technikgestaltung** (Art. 25 DSGVO).
+
+### Audit-Logging / Zugriffskontrolle
+
+Protokollierung von Zugriffen und Zugriffskontrolle liegen in der Verantwortung des Verantwortlichen — etwa ueber die Berechtigungssteuerung von Propstack (API-Schluessel-Berechtigungen) oder ueber Protokollierung auf Client- bzw. Sitzungsebene. Da der Server zustandslos ist und lokal beim jeweiligen Nutzer laeuft, ist eine solche Protokollierung nicht im Werkzeug selbst enthalten.
 
 ## Development
 

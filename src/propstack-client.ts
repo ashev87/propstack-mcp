@@ -4,6 +4,8 @@ const V1_BASE = "https://api.propstack.de/v1";
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
+/** Abort a single request attempt if the server does not respond in time. */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export interface PropstackRequestOptions {
   params?: Record<string, string | number | boolean | string[] | number[] | undefined>;
@@ -93,7 +95,9 @@ export class PropstackClient {
 
       let res: Response;
       try {
-        res = await fetch(url, init);
+        // Fresh timeout signal per attempt — a timeout aborts only this try,
+        // leaving retries (network errors and timeouts both fall through here).
+        res = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         continue;

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackProperty, PropstackPropertyStatus, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt, fmtPrice, fmtArea, stripUndefined } from "./helpers.js";
+import { textResult, errorResult, fmt, fmtPrice, fmtArea, stripUndefined, validateFields, renderProjectedRecord, applyCustomFilters, PROPERTY_FIELDS } from "./helpers.js";
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ Use this tool to:
 - Filter by status, type, marketing type, or project
 - Find properties in a price/rent range
 - List properties by size, rooms, or construction year
-- Filter by custom fields with cf_ prefix parameters
+- Filter by custom fields via the 'custom_filters' object (see below)
 
 The 'q' parameter searches: unit_id, street, zip code, city, district, exposé ID.
 
@@ -103,7 +103,16 @@ Common queries:
 - "Properties on market 90+ days": sort_by=created_at, order=asc
 - "What's in Project X?": project_id=<id>
 
-Always returns total count. Use expand=true for custom fields.`,
+Custom fields: pass 'custom_filters' as an object of custom-field-name →
+value (use list_custom_fields to discover field names). Each entry becomes
+a cf_<name> query parameter, e.g. { energy_class: "A" }.
+
+Always returns total count. Use expand=true for custom fields.
+
+Data minimization (Art. 25 DSGVO): pass 'fields' with an array of property
+field names to return only those fields per property (e.g. ["id", "title",
+"price", "city"]). Omit 'fields' to return the default set unchanged.
+Unknown field names produce an error listing the valid options.`,
     {
       q: z.string().optional()
         .describe("Fulltext search across unit_id, street, zip, city, district, exposé ID"),
@@ -163,13 +172,23 @@ Always returns total count. Use expand=true for custom fields.`,
         .describe("Page number (default: 1)"),
       per_page: z.number().optional()
         .describe("Results per page (default: 25)"),
+      custom_filters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional()
+        .describe("Filter by custom field values. Keys are custom field names WITHOUT the cf_ prefix (use list_custom_fields to discover them); each becomes a cf_<name>=<value> query parameter. Example: { energy_class: \"A\" }"),
+      fields: z.array(z.string()).optional()
+        .describe("Data minimization: return only these property fields per result (e.g. [\"id\", \"title\", \"price\", \"city\"]). Omit to return the default field set. Unknown field names produce an error."),
     },
     async (args) => {
       try {
-        const params: Record<string, string | number | boolean | string[] | number[] | undefined> = {
-          with_meta: 1,
-          ...args,
-        };
+        if (args.fields && args.fields.length > 0) {
+          const fieldError = validateFields(args.fields, PROPERTY_FIELDS, "property");
+          if (fieldError) return textResult(fieldError);
+        }
+
+        const { fields, custom_filters, ...apiArgs } = args;
+        const params = applyCustomFilters(
+          { with_meta: 1, ...apiArgs } as Record<string, string | number | boolean | string[] | number[] | undefined>,
+          custom_filters,
+        );
 
         const res = await client.get<PropstackPaginatedResponse<PropstackProperty>>(
           "/units",
@@ -184,6 +203,13 @@ Always returns total count. Use expand=true for custom fields.`,
         const header = total !== undefined
           ? `Found ${total} properties (showing ${res.data.length}):\n\n`
           : `Found ${res.data.length} properties:\n\n`;
+
+        if (fields && fields.length > 0) {
+          const projected = res.data
+            .map((p) => renderProjectedRecord(p as unknown as Record<string, unknown>, fields, `**ID: ${p.id}**`))
+            .join("\n\n---\n\n");
+          return textResult(header + projected);
+        }
 
         const tableHeader = "| ID | Title | Type | Address | Price | Size | Rooms | Status |\n| --- | --- | --- | --- | --- | --- | --- | --- |";
         const rows = res.data.map(formatPropertyRow).join("\n");

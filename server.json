@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ashev87/propstack-mcp",
+  "description": "MCP server for Propstack real estate CRM — connect AI assistants to your Propstack data (contacts, properties, deals, search profiles, tasks, email).",
+  "repository": {
+    "url": "https://github.com/ashev87/propstack-mcp",
+    "source": "github"
+  },
+  "version": "1.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "propstack-mcp-server",
+      "version": "1.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PROPSTACK_API_KEY",
+          "description": "Your Propstack V1 API key (Verwaltung > API-Schluessel in crm.propstack.de). Determines which endpoints are accessible.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

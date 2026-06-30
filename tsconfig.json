@@ -39,5 +39,7 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  // Build only the server sources; test files are handled by Vitest.
+  "include": ["src/**/*"],
 }
