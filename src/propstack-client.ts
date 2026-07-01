@@ -71,6 +71,18 @@ export class PropstackClient {
     path: string,
     opts?: PropstackRequestOptions,
   ): Promise<T> {
+    if (!this.apiKey) {
+      // Deferred until the first real request: the server is allowed to start
+      // without a key (so tools can be listed), but any actual API call needs
+      // one. Reuse the 401 path so callers get the standard key-error message.
+      throw new PropstackError(
+        401,
+        "Unauthorized",
+        "PROPSTACK_API_KEY is not configured",
+        path,
+      );
+    }
+
     const url = this.buildUrl(path, opts?.params);
 
     const headers: Record<string, string> = {
