@@ -23,11 +23,19 @@ import { registerLookupTools } from "./tools/lookups.js";
 import { registerCompositeTools } from "./tools/composites.js";
 import { registerAdminTools } from "./tools/admin.js";
 
-const PROPSTACK_API_KEY = process.env["PROPSTACK_API_KEY"];
+// The key is optional at startup so the server can boot and advertise its
+// tools even when no key is configured. This is required by MCP registry
+// scanners (e.g. Glama), which launch the server and call `tools/list`
+// without any secrets. A missing key only fails at request time, where it
+// surfaces as a clear "Invalid API key" tool error instead of crashing the
+// whole process on boot.
+const PROPSTACK_API_KEY = process.env["PROPSTACK_API_KEY"] ?? "";
 
 if (!PROPSTACK_API_KEY) {
-  console.error("Error: PROPSTACK_API_KEY environment variable is required");
-  process.exit(1);
+  console.error(
+    "Warning: PROPSTACK_API_KEY is not set. The server will start and expose " +
+      "its tools, but every tool call will fail until you configure the key.",
+  );
 }
 
 const client = new PropstackClient(PROPSTACK_API_KEY);
