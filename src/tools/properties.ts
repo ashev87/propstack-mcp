@@ -30,6 +30,25 @@ function formatProperty(p: PropstackProperty): string {
     p.number_of_bath_rooms ? `Bathrooms: ${fmt(p.number_of_bath_rooms)}` : null,
     p.floor !== undefined && p.floor !== null ? `Floor: ${fmt(p.floor)}` : null,
     p.construction_year ? `Built: ${fmt(p.construction_year)}` : null,
+    p.energy_certificate_availability ? `Energy certificate: ${fmt(p.energy_certificate_availability)}` : null,
+    p.building_energy_rating_type ? `Energy rating type: ${fmt(p.building_energy_rating_type)}` : null,
+    p.energy_efficiency_class ? `Energy efficiency class: ${fmt(p.energy_efficiency_class)}` : null,
+    p.thermal_characteristic !== undefined && p.thermal_characteristic !== null
+      ? `Thermal characteristic: ${fmt(p.thermal_characteristic)} kWh/(m²·a)`
+      : null,
+    p.thermal_characteristic_electricity !== undefined && p.thermal_characteristic_electricity !== null
+      ? `Thermal characteristic electricity: ${fmt(p.thermal_characteristic_electricity)} kWh/(m²·a)`
+      : null,
+    p.thermal_characteristic_heating !== undefined && p.thermal_characteristic_heating !== null
+      ? `Thermal characteristic heating: ${fmt(p.thermal_characteristic_heating)} kWh/(m²·a)`
+      : null,
+    p.energy_consumption_contains_warm_water !== undefined && p.energy_consumption_contains_warm_water !== null
+      ? `Energy includes warm water: ${fmt(p.energy_consumption_contains_warm_water)}`
+      : null,
+    p.energy_certificate_start_date ? `Energy certificate issued: ${fmt(p.energy_certificate_start_date)}` : null,
+    p.energy_certificate_end_date ? `Energy certificate expires: ${fmt(p.energy_certificate_end_date)}` : null,
+    p.heating_type ? `Heating type: ${fmt(p.heating_type)}` : null,
+    p.firing_types ? `Energy carrier: ${fmt(p.firing_types)}` : null,
     `Status: ${fmt(p.property_status?.name)}`,
     `Broker: ${fmt(p.broker?.name, "unassigned")}`,
     p.project ? `Project: ${fmt(p.project.name)}` : null,
@@ -355,6 +374,27 @@ rs_category provides sub-types (e.g. PENTHOUSE, VILLA, MAISONETTE for APARTMENT/
       number_of_bath_rooms: z.number().optional().describe("Number of bathrooms"),
       floor: z.number().optional().describe("Floor number"),
       construction_year: z.number().optional().describe("Year of construction"),
+      // Energy certificate (GEG / Energieausweis)
+      energy_certificate_availability: z.string().optional()
+        .describe("Energy certificate availability/status (e.g. NOT_REQUIRED or the account's Propstack value)"),
+      building_energy_rating_type: z.string().optional()
+        .describe("Energy certificate rating type (Bedarfs- vs. Verbrauchsausweis)"),
+      energy_efficiency_class: z.string().optional()
+        .describe("Energy efficiency class, e.g. A+, A, B ... H"),
+      thermal_characteristic: z.number().optional()
+        .describe("Final energy demand/consumption in kWh/(m²·a)"),
+      thermal_characteristic_electricity: z.number().optional()
+        .describe("Electricity portion of the thermal characteristic"),
+      thermal_characteristic_heating: z.number().optional()
+        .describe("Heating portion of the thermal characteristic"),
+      energy_consumption_contains_warm_water: z.boolean().optional()
+        .describe("Whether energy consumption includes domestic hot water"),
+      energy_certificate_start_date: z.string().optional()
+        .describe("Energy certificate issue/start date in the format accepted by Propstack"),
+      energy_certificate_end_date: z.string().optional()
+        .describe("Energy certificate expiry/end date in the format accepted by Propstack"),
+      heating_type: z.string().optional().describe("Heating system type"),
+      firing_types: z.string().optional().describe("Energy carrier / firing type"),
       // Texts
       description_note: z.string().optional().describe("Property description text (HTML allowed)"),
       location_note: z.string().optional().describe("Location description text"),
@@ -430,6 +470,17 @@ Use get_property_statuses to look up valid status IDs.`,
       number_of_bath_rooms: z.number().optional().describe("Number of bathrooms"),
       floor: z.number().optional().describe("Floor number"),
       construction_year: z.number().optional().describe("Year of construction"),
+      energy_certificate_availability: z.string().optional().describe("Energy certificate availability/status"),
+      building_energy_rating_type: z.string().optional().describe("Energy certificate rating type"),
+      energy_efficiency_class: z.string().optional().describe("Energy efficiency class, e.g. A+ ... H"),
+      thermal_characteristic: z.number().optional().describe("Final energy demand/consumption in kWh/(m²·a)"),
+      thermal_characteristic_electricity: z.number().optional().describe("Electricity portion of the thermal characteristic"),
+      thermal_characteristic_heating: z.number().optional().describe("Heating portion of the thermal characteristic"),
+      energy_consumption_contains_warm_water: z.boolean().optional().describe("Whether energy consumption includes domestic hot water"),
+      energy_certificate_start_date: z.string().optional().describe("Energy certificate issue/start date"),
+      energy_certificate_end_date: z.string().optional().describe("Energy certificate expiry/end date"),
+      heating_type: z.string().optional().describe("Heating system type"),
+      firing_types: z.string().optional().describe("Energy carrier / firing type"),
       description_note: z.string().optional().describe("Property description text"),
       location_note: z.string().optional().describe("Location description text"),
       furnishing_note: z.string().optional().describe("Furnishing description text"),

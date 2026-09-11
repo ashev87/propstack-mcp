@@ -236,6 +236,19 @@ export interface PropstackProperty {
   floor: number | null;
   construction_year: number | null;
 
+  // Energy certificate (GEG / Energieausweis)
+  energy_certificate_availability: string | null;
+  building_energy_rating_type: string | null;
+  energy_efficiency_class: string | null;
+  thermal_characteristic: number | null;
+  thermal_characteristic_electricity: number | null;
+  thermal_characteristic_heating: number | null;
+  energy_consumption_contains_warm_water: boolean | null;
+  energy_certificate_start_date: string | null;
+  energy_certificate_end_date: string | null;
+  heating_type: string | null;
+  firing_types: string | null;
+
   // Description texts
   description_note: string | null;
   location_note: string | null;
