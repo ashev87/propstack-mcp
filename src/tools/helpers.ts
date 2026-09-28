@@ -69,26 +69,27 @@ export function formatError(err: unknown): string {
 }
 
 export function errorResult(entity: string, err: unknown) {
+  const toolError = (text: string) => ({ ...textResult(text), isError: true as const });
   if (err instanceof PropstackError) {
     const id = extractIdFromPath(err.path);
     if (err.status === 401) {
-      return textResult("Invalid API key. Check your PROPSTACK_API_KEY. Manage keys at crm.propstack.de/app/admin/api_keys");
+      return toolError("Invalid API key. Check your PROPSTACK_API_KEY. Manage keys at crm.propstack.de/app/admin/api_keys");
     }
     if (err.status === 403) {
-      return textResult("Insufficient permissions. Check API key permissions in Propstack admin.");
+      return toolError("Insufficient permissions. Check API key permissions in Propstack admin.");
     }
     if (err.status === 404) {
       return id
-        ? textResult(`${entity} not found. No ${entity.toLowerCase()} with ID ${id} exists.`)
-        : textResult(`${entity} not found.`);
+        ? toolError(`${entity} not found. No ${entity.toLowerCase()} with ID ${id} exists.`)
+        : toolError(`${entity} not found.`);
     }
     if (err.status === 422) {
-      return textResult(parse422(err.detail));
+      return toolError(parse422(err.detail));
     }
     if (err.status === 429) {
-      return textResult("Rate limited by Propstack API. Please try again in a moment.");
+      return toolError("Rate limited by Propstack API. Please try again in a moment.");
     }
-    return textResult(`Propstack API error ${err.status}: ${err.detail}`);
+    return toolError(`Propstack API error ${err.status}: ${err.detail}`);
   }
   const msg = formatError(err);
   return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true as const };
