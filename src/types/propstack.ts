@@ -225,22 +225,73 @@ export interface PropstackProperty {
   price: number | null;
   base_rent: number | null;
   total_rent: number | null;
+  service_charge: number | null;
+  heating_costs: number | null;
+  parking_space_price: number | null;
+  deposit: string | number | null;
+  sold_price: number | null;
+  sold_date: string | null;
 
   // Dimensions
   living_space: number | null;
   plot_area: number | null;
   property_space_value: number | null;
+  usable_floor_space: number | null;
+  total_floor_space: number | null;
+  balcony_space: number | null;
   number_of_rooms: number | null;
   number_of_bed_rooms: number | null;
   number_of_bath_rooms: number | null;
   floor: number | null;
+  floor_label: string | null;
+  number_of_floors: number | null;
+  number_of_balconies: number | null;
+  number_of_terraces: number | null;
+  number_of_parking_spaces: number | null;
+  parking_space_type: string | null;
   construction_year: number | null;
+
+  // Energy certificate
+  energy_certificate_availability: string | null;
+  building_energy_rating_type: string | null;
+  energy_efficiency_class: string | null;
+  thermal_characteristic: number | null;
+  thermal_characteristic_electricity: number | null;
+  thermal_characteristic_heating: number | null;
+  energy_consumption_contains_warm_water: boolean | null;
+  energy_certificate_start_date: string | null;
+  energy_certificate_end_date: string | null;
+  heating_type: string | null;
+  firing_types: string | string[] | null;
+
+  // Equipment and condition
+  lift: boolean | null;
+  cellar: boolean | null;
+  barrier_free: boolean | null;
+  guest_toilet: boolean | null;
+  built_in_kitchen: boolean | null;
+  balcony: boolean | null;
+  garden: boolean | null;
+  terrace: boolean | null;
+  monument: boolean | null;
+  last_refurbishment: number | null;
+  condition: string | null;
+  interior_quality: string | null;
+  equipment_technology_construction_year: number | null;
+
+  // Marketing and availability
+  free_from: string | null;
+  rented: boolean | null;
 
   // Description texts
   description_note: string | null;
   location_note: string | null;
   furnishing_note: string | null;
   other_note: string | null;
+  long_description_note: string | null;
+  long_location_note: string | null;
+  long_furnishing_note: string | null;
+  long_other_note: string | null;
 
   // Commission
   courtage: string | null;

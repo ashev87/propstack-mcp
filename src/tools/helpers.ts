@@ -203,6 +203,21 @@ export const PROPERTY_FIELDS = [
   "courtage", "courtage_note", "broker_id", "broker", "project_id", "project",
   "status", "property_status", "property_groups", "custom_fields", "images",
   "floorplans", "documents", "links", "created_at", "updated_at", "archived",
+  // German residential exposé fields (energy certificate, equipment, layout, costs)
+  "energy_certificate_availability", "building_energy_rating_type",
+  "energy_efficiency_class", "thermal_characteristic",
+  "thermal_characteristic_electricity", "thermal_characteristic_heating",
+  "energy_consumption_contains_warm_water", "energy_certificate_start_date",
+  "energy_certificate_end_date", "heating_type", "firing_types", "lift",
+  "cellar", "barrier_free", "guest_toilet", "built_in_kitchen", "balcony",
+  "garden", "terrace", "monument", "number_of_floors", "number_of_balconies",
+  "number_of_terraces", "number_of_parking_spaces", "floor_label",
+  "parking_space_type", "last_refurbishment", "condition", "interior_quality",
+  "equipment_technology_construction_year", "service_charge", "heating_costs",
+  "parking_space_price", "deposit", "sold_price", "sold_date",
+  "usable_floor_space", "total_floor_space", "balcony_space", "free_from",
+  "rented", "long_description_note", "long_location_note",
+  "long_furnishing_note", "long_other_note",
 ] as const;
 
 export const DEAL_FIELDS = [
