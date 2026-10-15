@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-10-15
+
+### Added
+- **German residential property fields** on `create_property` / `update_property`,
+  shown in `get_property`: energy certificate (GEG: availability, rating type,
+  efficiency class, thermal characteristics, validity dates, heating type,
+  energy carrier), equipment (lift, cellar, balcony, garden, terrace, built-in
+  kitchen, guest toilet, barrier-free, listed building), layout and condition,
+  costs (Hausgeld/service charge, heating costs, deposit, parking), areas,
+  `free_from`, `rented` and the long portal texts. Previously these fields were
+  silently dropped by the server (#2, #3, #8). They are also accepted by the
+  `fields` parameter of `search_properties`.
+- **Image tools:** `list_property_images`, `upload_image`, `update_image`.
+- **`match_properties_to_contact`** — reverse matching: which listings fit a
+  contact's search profiles.
+
+### Changed
+- Matching now scores the profile's feature flags (balcony, lift, garden,
+  built-in kitchen, cellar, rented). The tool description already promised this;
+  the scoring is now shared by both matching tools.
+- Propstack API failures are returned as MCP tool errors (`isError: true`), so
+  clients can tell a failed call from a successful one (#9).
+- README: ChatGPT / claude.ai section now states that these clients need a
+  remote HTTPS server, with a warning against exposing the server unauthenticated.
+
 ## [1.1.0] — 2026-06-30
 
 ### Added

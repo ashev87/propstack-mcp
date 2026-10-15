@@ -11,7 +11,31 @@ import {
   fmtArea,
   stripUndefined,
   CONTACT_FIELDS,
+  errorResult,
+  textResult,
 } from "../src/tools/helpers.js";
+import { PropstackError } from "../src/propstack-client.js";
+
+describe("errorResult", () => {
+  it.each([401, 403, 404, 422, 429, 500])("marks API status %i as a tool error", (status) => {
+    const result = errorResult("Contact", new PropstackError(status, "Failure", '{"errors":{"email":["invalid"]}}', "/contacts/123"));
+    expect(result.isError).toBe(true);
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).not.toBe("");
+  });
+
+  it("keeps helpful entity and validation messages", () => {
+    expect(errorResult("Contact", new PropstackError(404, "Not Found", "", "/contacts/123")).content[0].text)
+      .toBe("Contact not found. No contact with ID 123 exists.");
+    expect(errorResult("Contact", new PropstackError(422, "Invalid", '{"errors":{"email":["invalid"]}}')).content[0].text)
+      .toBe("Validation failed:\n  email: invalid");
+  });
+
+  it("keeps generic failures marked as errors and successful text unmarked", () => {
+    expect(errorResult("Contact", new Error("offline")).isError).toBe(true);
+    expect(textResult("saved")).not.toHaveProperty("isError");
+  });
+});
 
 describe("validateFields", () => {
   it("returns null when every requested field is known", () => {

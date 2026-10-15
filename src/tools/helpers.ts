@@ -69,26 +69,27 @@ export function formatError(err: unknown): string {
 }
 
 export function errorResult(entity: string, err: unknown) {
+  const toolError = (text: string) => ({ ...textResult(text), isError: true as const });
   if (err instanceof PropstackError) {
     const id = extractIdFromPath(err.path);
     if (err.status === 401) {
-      return textResult("Invalid API key. Check your PROPSTACK_API_KEY. Manage keys at crm.propstack.de/app/admin/api_keys");
+      return toolError("Invalid API key. Check your PROPSTACK_API_KEY. Manage keys at crm.propstack.de/app/admin/api_keys");
     }
     if (err.status === 403) {
-      return textResult("Insufficient permissions. Check API key permissions in Propstack admin.");
+      return toolError("Insufficient permissions. Check API key permissions in Propstack admin.");
     }
     if (err.status === 404) {
       return id
-        ? textResult(`${entity} not found. No ${entity.toLowerCase()} with ID ${id} exists.`)
-        : textResult(`${entity} not found.`);
+        ? toolError(`${entity} not found. No ${entity.toLowerCase()} with ID ${id} exists.`)
+        : toolError(`${entity} not found.`);
     }
     if (err.status === 422) {
-      return textResult(parse422(err.detail));
+      return toolError(parse422(err.detail));
     }
     if (err.status === 429) {
-      return textResult("Rate limited by Propstack API. Please try again in a moment.");
+      return toolError("Rate limited by Propstack API. Please try again in a moment.");
     }
-    return textResult(`Propstack API error ${err.status}: ${err.detail}`);
+    return toolError(`Propstack API error ${err.status}: ${err.detail}`);
   }
   const msg = formatError(err);
   return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true as const };
@@ -202,6 +203,21 @@ export const PROPERTY_FIELDS = [
   "courtage", "courtage_note", "broker_id", "broker", "project_id", "project",
   "status", "property_status", "property_groups", "custom_fields", "images",
   "floorplans", "documents", "links", "created_at", "updated_at", "archived",
+  // German residential exposé fields (energy certificate, equipment, layout, costs)
+  "energy_certificate_availability", "building_energy_rating_type",
+  "energy_efficiency_class", "thermal_characteristic",
+  "thermal_characteristic_electricity", "thermal_characteristic_heating",
+  "energy_consumption_contains_warm_water", "energy_certificate_start_date",
+  "energy_certificate_end_date", "heating_type", "firing_types", "lift",
+  "cellar", "barrier_free", "guest_toilet", "built_in_kitchen", "balcony",
+  "garden", "terrace", "monument", "number_of_floors", "number_of_balconies",
+  "number_of_terraces", "number_of_parking_spaces", "floor_label",
+  "parking_space_type", "last_refurbishment", "condition", "interior_quality",
+  "equipment_technology_construction_year", "service_charge", "heating_costs",
+  "parking_space_price", "deposit", "sold_price", "sold_date",
+  "usable_floor_space", "total_floor_space", "balcony_space", "free_from",
+  "rented", "long_description_note", "long_location_note",
+  "long_furnishing_note", "long_other_note",
 ] as const;
 
 export const DEAL_FIELDS = [

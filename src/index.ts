@@ -21,6 +21,7 @@ import { registerDocumentTools } from "./tools/documents.js";
 import { registerRelationshipTools } from "./tools/relationships.js";
 import { registerLookupTools } from "./tools/lookups.js";
 import { registerCompositeTools } from "./tools/composites.js";
+import { registerImageTools } from "./tools/images.js";
 import { registerAdminTools } from "./tools/admin.js";
 
 // The key is optional at startup so the server can boot and advertise its
@@ -61,6 +62,7 @@ registerProjectTools(server, client);
 registerActivityTools(server, client);
 registerEmailTools(server, client);
 registerDocumentTools(server, client);
+registerImageTools(server, client);
 registerRelationshipTools(server, client);
 registerLookupTools(server, client);
 registerCompositeTools(server, client);
