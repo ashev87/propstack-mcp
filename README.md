@@ -62,12 +62,18 @@ Add to your project's `.mcp.json`:
 }
 ```
 
-### 2c. ChatGPT
+### 2c. ChatGPT and claude.ai (web / mobile)
 
-1. Go to **Settings > Connectors > Developer Mode**
-2. Add a new MCP connector
-3. Set the command to `npx -y propstack-mcp-server`
-4. Add environment variable `PROPSTACK_API_KEY`
+These clients only connect to **remote** MCP servers over an HTTPS URL. They
+cannot start a local `npx` command, so this server can't be added to them
+directly — use Claude Desktop, Claude Code, Cursor or another local client
+instead.
+
+If you need ChatGPT or the claude.ai apps, the server has to run behind an
+authenticated HTTPS endpoint. **Do not** expose it through an open tunnel or
+an unauthenticated stdio-to-HTTP bridge: anyone with the URL would get full
+read/write access to your CRM with your API key. Open an issue if you need a
+hosted setup.
 
 ### 2d. Cursor IDE
 
@@ -126,7 +132,7 @@ Get your Propstack API key:
 
 > **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
 
-## Available Tools (49)
+## Available Tools (56)
 
 ### Contacts (Kontakte)
 
@@ -203,6 +209,14 @@ Get your Propstack API key:
 | `list_documents` | List files attached to a property, project, or contact |
 | `upload_document` | Upload a document (base64 data URI) |
 
+### Images (Bilder)
+
+| Tool | Description |
+|---|---|
+| `list_property_images` | List a property's images and floor plans in portal order (IDs, titles, flags) |
+| `upload_image` | Upload an image to a property or project (base64 data URI, portal visibility) |
+| `update_image` | Change an image's title (incl. `title_de` / `title_en`) or portal visibility |
+
 ### Relationships (Beziehungen)
 
 | Tool | Description |
@@ -235,6 +249,7 @@ Get your Propstack API key:
 | `pipeline_summary` | Deals per stage, total values, stale deals needing attention |
 | `smart_lead_intake` | Full lead workflow: dedup, create/update, log notes, deal, reminder |
 | `match_contacts_to_property` | Find buyers whose search profiles match a property |
+| `match_properties_to_contact` | Reverse matching: find properties that fit a contact's search profiles |
 
 ### Admin (Verwaltung)
 
