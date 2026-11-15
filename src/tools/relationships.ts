@@ -79,4 +79,63 @@ The name field describes the role (e.g. "Käufer", "Mieter", "Verwalter").`,
       }
     },
   );
+
+  // ── delete_ownership / delete_partnership ───────────────────────
+
+  for (const [tool, path, label] of [
+    ["delete_ownership", "/ownerships", "owner (Eigentümer)"],
+    ["delete_partnership", "/partnerships", "partner (buyer, tenant, …)"],
+  ] as const) {
+    server.tool(
+      tool,
+      `Remove the link between a contact and a property as ${label}.
+
+The contact and the property themselves are not deleted.`,
+      {
+        client_id: z.number()
+          .describe("Contact ID"),
+        property_id: z.number()
+          .describe("Property ID"),
+      },
+      async (args) => {
+        try {
+          await client.delete(path, { body: args });
+          return textResult(
+            `Contact ${args.client_id} is no longer linked to property ${args.property_id} as ${label}.`,
+          );
+        } catch (err) {
+          return errorResult(tool === "delete_ownership" ? "Ownership" : "Partnership", err);
+        }
+      },
+    );
+  }
+
+  // ── toggle_contact_favorite ─────────────────────────────────────
+
+  server.tool(
+    "toggle_contact_favorite",
+    `Mark a property as a favorite of a contact, or remove it if it already is one.
+
+Propstack toggles: calling this twice restores the original state. Check
+the current favorites with get_contact_favorites first.`,
+    {
+      client_id: z.number()
+        .describe("Contact ID"),
+      property_id: z.number()
+        .describe("Property ID"),
+    },
+    async (args) => {
+      try {
+        await client.post(`/contacts/${args.client_id}/favorites`, {
+          params: { property_id: args.property_id },
+        });
+        return textResult(
+          `Favorite toggled for contact ${args.client_id} and property ${args.property_id}. ` +
+          `Use get_contact_favorites to see the current state.`,
+        );
+      } catch (err) {
+        return errorResult("Favorite", err);
+      }
+    },
+  );
 }

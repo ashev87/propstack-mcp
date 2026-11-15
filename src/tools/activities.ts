@@ -1,8 +1,16 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
-import type { PropstackActivity, PropstackEvent, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt } from "./helpers.js";
+import type {
+  PropstackActivity,
+  PropstackActivityDetail,
+  PropstackEvent,
+  PropstackPaginatedResponse,
+} from "../types/propstack.js";
+import { textResult, errorResult, fmt, htmlToText, stripUndefined } from "./helpers.js";
+
+/** Longest email/note body returned by get_activity before truncation. */
+const MAX_BODY_CHARS = 8000;
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -17,28 +25,43 @@ function getActivityType(a: PropstackActivity): string {
   return "—";
 }
 
+/** "Name (ID: 1), Other (ID: 2)" from parallel id/name arrays. */
+export function namedIds(ids: number[], names?: string[] | null): string {
+  return ids.map((id, i) => (names?.[i] ? `${names[i]} (ID: ${id})` : `ID ${id}`)).join(", ");
+}
+
 function formatActivity(a: PropstackActivity): string {
   const lines: (string | null)[] = [
     `**${fmt(a.title, "Untitled")}** (ID: ${a.id})`,
-    `Type: ${getActivityType(a)}`,
+    `Type: ${getActivityType(a)}${a.outgoing === true ? " (outgoing)" : a.outgoing === false && getActivityType(a) === "message" ? " (incoming)" : ""}`,
     fmt(a.body, "") ? `Body: ${fmt(a.body)}` : null,
     a.broker ? `Broker: ${fmt(a.broker.name)}` : (a.broker_id ? `Broker ID: ${a.broker_id}` : null),
   ];
 
-  if (a.client) {
+  if (a.client_ids?.length) {
+    lines.push(`Contacts: ${namedIds(a.client_ids, a.client_names)}`);
+  } else if (a.client) {
     const name = fmt(a.client.name) !== "none" ? fmt(a.client.name) : [fmt(a.client.first_name, ""), fmt(a.client.last_name, "")].filter(Boolean).join(" ") || "Unnamed";
     lines.push(`Contact: ${name} (ID: ${a.client.id})`);
   } else if (a.client_id) {
     lines.push(`Contact ID: ${a.client_id}`);
   }
 
-  if (a.property) {
+  if (a.property_ids?.length) {
+    lines.push(`Properties: ${namedIds(a.property_ids, a.property_names)}`);
+  } else if (a.property) {
     lines.push(`Property: ${fmt(a.property.title, "Untitled")} (ID: ${a.property.id})`);
   } else if (a.property_id) {
     lines.push(`Property ID: ${a.property_id}`);
   }
 
-  if (a.project_id) lines.push(`Project ID: ${a.project_id}`);
+  if (a.project_ids?.length) {
+    lines.push(`Projects: ${namedIds(a.project_ids, a.project_names)}`);
+  } else if (a.project_id) {
+    lines.push(`Project ID: ${a.project_id}`);
+  }
+  if (a.starts_at) lines.push(`Starts: ${a.starts_at}`);
+  if (a.attachments_count) lines.push(`Attachments: ${a.attachments_count}`);
   lines.push(`Date: ${fmt(a.created_at)}`);
 
   return lines.filter(Boolean).join("\n");
@@ -69,6 +92,65 @@ function formatEvent(e: PropstackEvent): string {
   if (fmt(e.body, "")) lines.push(`Notes: ${fmt(e.body)}`);
 
   return lines.filter(Boolean).join("\n");
+}
+
+/** Render GET /activities/:id — the email, task or policy inside the activity. */
+export function formatActivityDetail(detail: PropstackActivityDetail): string {
+  const kind = fmt(detail.activatable_type, "Unknown");
+  const item = detail.activatable ?? {};
+  const get = (k: string) => (item as Record<string, unknown>)[k];
+  const list = (k: string) => {
+    const v = get(k);
+    return Array.isArray(v) && v.length ? v.map(String).join(", ") : null;
+  };
+  const ids = (k: string) => {
+    const v = get(k);
+    return Array.isArray(v) && v.length ? v.join(", ") : null;
+  };
+
+  const lines: (string | null)[] = [`# Activity ${detail.id} (${kind})`];
+
+  if (kind === "Message") {
+    lines.push(
+      `**${fmt(get("subject"), "No subject")}** (email ID: ${fmt(get("id"))})`,
+      `From: ${list("from") ?? fmt(get("from"))}`,
+      `To: ${list("to") ?? "none"}`,
+      list("cc") ? `CC: ${list("cc")}` : null,
+      get("broker_id") ? `Broker ID: ${fmt(get("broker_id"))}` : null,
+      get("read") !== undefined ? `Read: ${get("read") ? "yes" : "no"}` : null,
+    );
+  } else {
+    lines.push(
+      `**${fmt(get("title"), "Untitled")}** (ID: ${fmt(get("id"))})`,
+      get("broker_id") ? `Broker ID: ${fmt(get("broker_id"))}` : null,
+      get("starts_at") ? `Starts: ${fmt(get("starts_at"))}` : null,
+      get("due_date") ? `Due: ${fmt(get("due_date"))}` : null,
+      get("done") !== undefined && get("done") !== null ? `Done: ${get("done") ? "yes" : "no"}` : null,
+    );
+  }
+
+  if (ids("client_ids")) lines.push(`Contact IDs: ${ids("client_ids")}`);
+  if (ids("property_ids")) lines.push(`Property IDs: ${ids("property_ids")}`);
+  if (ids("project_ids")) lines.push(`Project IDs: ${ids("project_ids")}`);
+
+  const attachments = get("attachments");
+  if (Array.isArray(attachments) && attachments.length) {
+    const names = attachments.map((a) =>
+      fmt((a as Record<string, unknown>)?.["name"], "unnamed"));
+    lines.push(`Attachments: ${names.join(", ")}`);
+  }
+  lines.push(`Date: ${fmt(get("created_at"))}`);
+
+  const rawBody = get("body") ?? get("body_plain");
+  let body = htmlToText(typeof rawBody === "string" ? rawBody : null);
+  if (body) {
+    if (body.length > MAX_BODY_CHARS) {
+      body = `${body.slice(0, MAX_BODY_CHARS)}\n\n[… truncated, ${body.length - MAX_BODY_CHARS} more characters]`;
+    }
+    lines.push("", "## Content", "", body);
+  }
+
+  return lines.filter((l) => l !== null).join("\n");
 }
 
 // ── Tool registration ────────────────────────────────────────────────
@@ -102,7 +184,11 @@ Activity types:
 - sms: SMS messages
 - letter: Letters (Briefe)
 
-Use list_activity_types to see all valid types for this account.`,
+Use list_activity_types to see all valid types for this account.
+
+To read emails: filter with type "message" (optionally only_inquiries for
+portal/website inquiries and a date range), then open one with
+get_activity to see the full email text.`,
     {
       type: z.enum(["message", "note", "reminder", "event", "policy", "cancelation", "decision", "sms", "letter"]).optional()
         .describe("Filter by activity type"),
@@ -114,6 +200,14 @@ Use list_activity_types to see all valid types for this account.`,
         .describe("Filter by property ID — show all activity for this property"),
       project_id: z.number().optional()
         .describe("Filter by project ID"),
+      only_inquiries: z.boolean().optional()
+        .describe("Only inquiries (Anfragen), e.g. from portals or the website"),
+      not_completed: z.boolean().optional()
+        .describe("Only activities that are not completed (open to-dos)"),
+      created_from: z.string().optional()
+        .describe("Created at or after (ISO 8601, e.g. '2026-11-01T00:00:00+01:00')"),
+      created_to: z.string().optional()
+        .describe("Created at or before (ISO 8601)"),
       sort_by: z.string().optional()
         .describe("Field to sort by"),
       order: z.enum(["asc", "desc"]).optional()
@@ -125,9 +219,18 @@ Use list_activity_types to see all valid types for this account.`,
     },
     async (args) => {
       try {
+        const { type, created_from, created_to, ...rest } = args;
+        // The API filters by item_type and original_created_at_*; sending
+        // "type" was silently ignored and returned every activity type.
+        const params = stripUndefined({
+          ...rest,
+          item_type: type,
+          original_created_at_from: created_from,
+          original_created_at_to: created_to,
+        });
         const res = await client.get<PropstackPaginatedResponse<PropstackActivity>>(
           "/activities",
-          { params: args as Record<string, string | number | boolean | undefined> },
+          { params: params as Record<string, string | number | boolean | undefined> },
         );
 
         if (!res.data || res.data.length === 0) {
@@ -140,6 +243,34 @@ Use list_activity_types to see all valid types for this account.`,
 
         const formatted = res.data.map(formatActivity).join("\n\n---\n\n");
         return textResult(header + formatted);
+      } catch (err) {
+        return errorResult("Activity", err);
+      }
+    },
+  );
+
+  // ── get_activity ────────────────────────────────────────────────
+
+  server.tool(
+    "get_activity",
+    `Open a single activity from search_activities and show its full content.
+
+For emails (incoming or outgoing) this returns subject, sender, recipients,
+linked contacts/properties and the email text (HTML converted to plain
+text, long bodies truncated). For notes, to-dos and appointments it returns
+the task details.
+
+Use this to read inbound emails and inquiries, e.g. after
+search_activities with type "message". Email content is personal data:
+only fetch what the task needs.`,
+    {
+      id: z.number()
+        .describe("Activity ID (from search_activities)"),
+    },
+    async (args) => {
+      try {
+        const detail = await client.get<PropstackActivityDetail>(`/activities/${args.id}`);
+        return textResult(formatActivityDetail(detail));
       } catch (err) {
         return errorResult("Activity", err);
       }

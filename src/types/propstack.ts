@@ -605,6 +605,26 @@ export interface PropstackActivity {
   appointment_id?: number | null;
   note_id?: number | null;
   message_id?: number | null;
+
+  // List fields documented for GET /activities
+  client_ids?: number[] | null;
+  property_ids?: number[] | null;
+  project_ids?: number[] | null;
+  client_names?: string[] | null;
+  property_names?: string[] | null;
+  project_names?: string[] | null;
+  outgoing?: boolean | null;
+  done?: boolean | null;
+  state?: string | null;
+  starts_at?: string | null;
+  attachments_count?: number | null;
+}
+
+/** GET /activities/:id — a container around the underlying email, task or policy. */
+export interface PropstackActivityDetail {
+  id: number;
+  activatable_type: "Message" | "Task" | "Policy" | string | null;
+  activatable: Record<string, unknown> | null;
 }
 
 // ── Event (Termin — calendar read view) ─────────────────────────────

@@ -1,6 +1,8 @@
 export type { PropstackPaginatedResponse } from "./types/propstack.js";
 
-const V1_BASE = "https://api.propstack.de/v1";
+export const V1_BASE = "https://api.propstack.de/v1";
+/** API V2 (officially beta). Used only for endpoints V1 lacks (image delete/sort, portals). */
+export const V2_BASE = "https://api.propstack.de/v2";
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
@@ -27,10 +29,12 @@ export class PropstackError extends Error {
 export class PropstackClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  private readonly keyName: string;
 
-  constructor(apiKey: string, baseUrl: string = V1_BASE) {
+  constructor(apiKey: string, baseUrl: string = V1_BASE, keyName = "PROPSTACK_API_KEY") {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    this.keyName = keyName;
   }
 
   async get<T>(path: string, opts?: PropstackRequestOptions): Promise<T> {
@@ -78,7 +82,7 @@ export class PropstackClient {
       throw new PropstackError(
         401,
         "Unauthorized",
-        "PROPSTACK_API_KEY is not configured",
+        `${this.keyName} is not configured`,
         path,
       );
     }
@@ -92,7 +96,7 @@ export class PropstackClient {
 
     const init: RequestInit = { method, headers };
 
-    if (opts?.body !== undefined && (method === "POST" || method === "PUT" || method === "PATCH")) {
+    if (opts?.body !== undefined && method !== "GET") {
       headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(opts.body);
     }

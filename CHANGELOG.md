@@ -3,6 +3,37 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-11-15
+
+### Added
+- **Reading emails:** `get_activity` opens a single activity; for emails
+  (incoming and outgoing) it returns subject, sender, recipients, linked
+  records and the text (HTML converted to plain text, long bodies truncated).
+  `search_activities` gained `only_inquiries`, `not_completed` and a
+  `created_from` / `created_to` date range. Completes the email part of #2.
+- **Images:** `delete_image`, `sort_images`; `update_image` can now set
+  `is_floorplan`, `is_not_for_exposee` and `position`. These use API V2 (beta),
+  since V1 has no endpoints for them. Completes the image part of #2.
+- **Portal export:** `list_portals` (API V2) and `publish_to_portals`.
+- **Property links:** `create_property_link`, `update_property_link`,
+  `delete_property_link`. `get_property` now shows link IDs.
+- **Documents:** `get_document`, `update_document`, `delete_document`,
+  `list_document_tags`; `upload_document` accepts `tags`.
+- **Projects:** `create_project`, `update_project`.
+- **Deletes:** `delete_property`, `delete_task`, `delete_ownership`,
+  `delete_partnership`; plus `toggle_contact_favorite`.
+- Optional `PROPSTACK_API_KEY_V2` for the V2 tools (falls back to `PROPSTACK_API_KEY`).
+
+### Fixed
+- `search_activities` sent the type filter as `type`, which the API ignores, so
+  filtering by type (e.g. only emails) returned every activity. It is now sent
+  as `item_type`. Results also show linked contacts/properties/projects by name
+  and mark emails as incoming or outgoing.
+
+### Changed
+- Dependencies updated (MCP SDK 1.32, zod 4.6, vitest 5); `npm audit` is clean
+  (was 17 advisories, 1 critical, in transitive SDK and test dependencies).
+
 ## [1.2.0] — 2026-10-15
 
 ### Added

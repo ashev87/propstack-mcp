@@ -297,4 +297,27 @@ Use this tool to:
       }
     },
   );
+
+  // ── delete_task ─────────────────────────────────────────────────
+
+  server.tool(
+    "delete_task",
+    `Delete a task, note or event (anything created with create_task).
+
+Confirm with the user before deleting. To mark a to-do as done instead,
+use update_task with done: true; to cancel an appointment, set its state
+to cancelled.`,
+    {
+      id: z.number()
+        .describe("Task ID to delete"),
+    },
+    async (args) => {
+      try {
+        await client.delete(`/tasks/${args.id}`);
+        return textResult(`Task ${args.id} deleted.`);
+      } catch (err) {
+        return errorResult("Task", err);
+      }
+    },
+  );
 }

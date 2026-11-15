@@ -4,7 +4,7 @@ import "dotenv/config";
 import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { PropstackClient } from "./propstack-client.js";
+import { PropstackClient, V2_BASE } from "./propstack-client.js";
 
 // Single source of truth for the version advertised to MCP clients.
 const require = createRequire(import.meta.url);
@@ -23,6 +23,8 @@ import { registerLookupTools } from "./tools/lookups.js";
 import { registerCompositeTools } from "./tools/composites.js";
 import { registerImageTools } from "./tools/images.js";
 import { registerAdminTools } from "./tools/admin.js";
+import { registerPortalTools } from "./tools/portals.js";
+import { registerLinkTools } from "./tools/links.js";
 
 // The key is optional at startup so the server can boot and advertise its
 // tools even when no key is configured. This is required by MCP registry
@@ -40,6 +42,16 @@ if (!PROPSTACK_API_KEY) {
 }
 
 const client = new PropstackClient(PROPSTACK_API_KEY);
+
+// API V2 is used only for the few endpoints V1 does not offer (image delete
+// and sort, portal list). Propstack can issue separate V2 keys; fall back to
+// the V1 key, which works when the key has V2 access.
+const PROPSTACK_API_KEY_V2 = process.env["PROPSTACK_API_KEY_V2"] || PROPSTACK_API_KEY;
+const clientV2 = new PropstackClient(
+  PROPSTACK_API_KEY_V2,
+  V2_BASE,
+  process.env["PROPSTACK_API_KEY_V2"] ? "PROPSTACK_API_KEY_V2" : "PROPSTACK_API_KEY",
+);
 
 const server = new McpServer(
   {
@@ -62,11 +74,13 @@ registerProjectTools(server, client);
 registerActivityTools(server, client);
 registerEmailTools(server, client);
 registerDocumentTools(server, client);
-registerImageTools(server, client);
+registerImageTools(server, client, clientV2);
 registerRelationshipTools(server, client);
 registerLookupTools(server, client);
 registerCompositeTools(server, client);
 registerAdminTools(server, client);
+registerPortalTools(server, client, clientV2);
+registerLinkTools(server, client);
 
 async function main() {
   const transport = new StdioServerTransport();

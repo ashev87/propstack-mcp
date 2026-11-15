@@ -2,7 +2,45 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackProject, PropstackPaginatedResponse } from "../types/propstack.js";
-import { textResult, errorResult, fmt } from "./helpers.js";
+import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
+
+// Writable project fields, per the V1 "Project Schema".
+const projectFields = {
+  name: z.string().optional()
+    .describe("Internal project name"),
+  title: z.string().optional()
+    .describe("Headline for the exposé"),
+  status: z.enum(["ACQUISITION", "PROGRESS", "SALES", "SOLD"]).optional()
+    .describe("Project phase: ACQUISITION (Akquise), PROGRESS (in Bau/Vorbereitung), SALES (Vertrieb), SOLD (verkauft)"),
+  broker_id: z.number().optional()
+    .describe("Responsible broker ID (see list_users)"),
+  for_rent: z.boolean().optional()
+    .describe("true = project of rental units"),
+  street: z.string().optional(),
+  house_number: z.string().optional(),
+  zip_code: z.string().optional(),
+  city: z.string().optional(),
+  lat: z.number().optional()
+    .describe("Latitude"),
+  lng: z.number().optional()
+    .describe("Longitude"),
+  location_id: z.number().optional()
+    .describe("Geolage ID (see list_locations)"),
+  construction_year: z.number().int().optional(),
+  courtage: z.string().optional()
+    .describe("Buyer commission, e.g. '3,57 % inkl. MwSt.'"),
+  courtage_note: z.string().optional(),
+  description_note: z.string().optional()
+    .describe("Project description (Objektbeschreibung)"),
+  location_note: z.string().optional()
+    .describe("Location description (Lage)"),
+  furnishing_note: z.string().optional()
+    .describe("Furnishing description (Ausstattung)"),
+  note: z.string().optional()
+    .describe("Internal note"),
+  warning_notice: z.string().optional()
+    .describe("Shown as a red warning bar on the project"),
+};
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -127,6 +165,56 @@ Use this tool to:
         );
 
         return textResult(formatProject(project));
+      } catch (err) {
+        return errorResult("Project", err);
+      }
+    },
+  );
+
+  // ── create_project ──────────────────────────────────────────────
+
+  server.tool(
+    "create_project",
+    `Create a development project (e.g. a new-build complex).
+
+A project groups several property units. After creating it, create the
+units with create_property and set their project_id.`,
+    {
+      ...projectFields,
+      name: z.string()
+        .describe("Internal project name"),
+    },
+    async (args) => {
+      try {
+        const res = await client.post<{ ok?: boolean; id?: number }>("/projects", {
+          body: { project: stripUndefined(args) },
+        });
+        return textResult(`Project "${args.name}" created (ID: ${fmt(res.id)}).`);
+      } catch (err) {
+        return errorResult("Project", err);
+      }
+    },
+  );
+
+  // ── update_project ──────────────────────────────────────────────
+
+  server.tool(
+    "update_project",
+    `Update a project. Only provide the fields you want to change.`,
+    {
+      id: z.number()
+        .describe("Project ID"),
+      ...projectFields,
+    },
+    async (args) => {
+      try {
+        const { id, ...fields } = args;
+        const project = stripUndefined(fields);
+        if (Object.keys(project).length === 0) {
+          return { ...textResult("Nothing to update: provide at least one field."), isError: true as const };
+        }
+        await client.put(`/projects/${id}`, { body: { project } });
+        return textResult(`Project ${id} updated (${Object.keys(project).join(", ")}).`);
       } catch (err) {
         return errorResult("Project", err);
       }

@@ -130,9 +130,11 @@ Get your Propstack API key:
 2. Go to **Verwaltung > API-Schluessel** (Administration > API Keys)
 3. Create or copy your V1 API key
 
+> **API V2:** A few tools (`sort_images`, `delete_image`, `list_portals`, and `update_image` with `is_floorplan` / `is_not_for_exposee` / `position`) use Propstack's API V2 (beta), because V1 has no such endpoints. They use `PROPSTACK_API_KEY_V2` if set, otherwise `PROPSTACK_API_KEY`. If your key has no V2 access, only these tools fail; everything else keeps working.
+
 > **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
 
-## Available Tools (56)
+## Available Tools (75)
 
 ### Contacts (Kontakte)
 
@@ -155,6 +157,17 @@ Get your Propstack API key:
 | `create_property` | Create a new property listing, including German residential exposé fields (energy certificate, equipment, costs) |
 | `update_property` | Update price, status, description, broker assignment, and German residential exposé fields |
 | `get_property_statuses` | List property statuses (Verfuegbar, Reserviert, Verkauft, etc.) |
+| `delete_property` | Delete a property (asks for confirmation first) |
+| `create_property_link` | Add a link (virtual tour, video, website) to a property |
+| `update_property_link` | Update a property link |
+| `delete_property_link` | Remove a property link |
+
+### Portals (Portal-Export)
+
+| Tool | Description |
+|---|---|
+| `list_portals` | List the account's portal connections (ImmoScout24, OpenImmo, …) — API V2 |
+| `publish_to_portals` | Publish properties to portals or take them offline |
 
 ### Tasks (Aufgaben & Notizen)
 
@@ -163,6 +176,7 @@ Get your Propstack API key:
 | `create_task` | Create a note, to-do, appointment, or cancellation (polymorphic) |
 | `update_task` | Mark done, reschedule, update notes |
 | `get_task` | Get task details with linked contacts, properties, projects |
+| `delete_task` | Delete a note, to-do or appointment |
 
 ### Deals (Pipeline)
 
@@ -187,12 +201,15 @@ Get your Propstack API key:
 |---|---|
 | `list_projects` | List development projects with unit counts |
 | `get_project` | Get project details with all units, media, documents |
+| `create_project` | Create a development project |
+| `update_project` | Update project status, address, descriptions, broker |
 
 ### Activities & Events (Aktivitaeten & Termine)
 
 | Tool | Description |
 |---|---|
-| `search_activities` | Full activity timeline for a contact, property, or project |
+| `search_activities` | Activity timeline for a contact, property, or project; filter by type, inquiries, date range |
+| `get_activity` | Open one activity — for emails the full text (incoming and outgoing) |
 | `list_events` | Calendar events — viewings, meetings, filtered by date/state |
 
 ### Emails (E-Mails)
@@ -202,12 +219,18 @@ Get your Propstack API key:
 | `send_email` | Send email using a Propstack template (snippet) |
 | `update_email` | Mark read/archived, categorize, link to CRM records |
 
+To read incoming emails: `search_activities` with `type: "message"` (optionally `only_inquiries`), then `get_activity`.
+
 ### Documents (Dokumente)
 
 | Tool | Description |
 |---|---|
 | `list_documents` | List files attached to a property, project, or contact |
-| `upload_document` | Upload a document (base64 data URI) |
+| `upload_document` | Upload a document (base64 data URI, tags) |
+| `get_document` | Get a document's details and download URL |
+| `update_document` | Change title, tags, floor-plan/exposé/private flags |
+| `delete_document` | Delete a document |
+| `list_document_tags` | List document tags (e.g. Energieausweis) |
 
 ### Images (Bilder)
 
@@ -215,7 +238,9 @@ Get your Propstack API key:
 |---|---|
 | `list_property_images` | List a property's images and floor plans in portal order (IDs, titles, flags) |
 | `upload_image` | Upload an image to a property or project (base64 data URI, portal visibility) |
-| `update_image` | Change an image's title (incl. `title_de` / `title_en`) or portal visibility |
+| `update_image` | Change an image's title (incl. `title_de` / `title_en`), portal visibility, floor-plan flag or position |
+| `sort_images` | Set the image order (first = title image) — API V2 |
+| `delete_image` | Delete an image or floor plan — API V2 |
 
 ### Relationships (Beziehungen)
 
@@ -223,6 +248,9 @@ Get your Propstack API key:
 |---|---|
 | `create_ownership` | Link a contact as property owner (Eigentuemer) |
 | `create_partnership` | Link a contact as buyer, tenant, etc. (Kaeufer, Mieter) |
+| `delete_ownership` | Remove an owner link |
+| `delete_partnership` | Remove a partner link |
+| `toggle_contact_favorite` | Add or remove a property from a contact's favorites |
 
 ### Lookups (Konfiguration)
 
@@ -341,24 +369,27 @@ npm start        # requires PROPSTACK_API_KEY
 ```
 src/
   index.ts                 # Server entry point (stdio transport)
-  propstack-client.ts      # HTTP client with auth, retry, error handling
+  propstack-client.ts      # HTTP client (V1 + V2) with auth, retry, error handling
   types/
     propstack.ts           # TypeScript interfaces for all API responses
   tools/
     helpers.ts             # Shared formatting utilities
     contacts.ts            # 7 contact tools
-    properties.ts          # 5 property tools
-    tasks.ts               # 3 task tools (polymorphic: note/todo/event/cancel)
+    properties.ts          # 6 property tools
+    tasks.ts               # 4 task tools (polymorphic: note/todo/event/cancel)
     deals.ts               # 3 deal pipeline tools
     search-profiles.ts     # 4 search profile tools
-    projects.ts            # 2 project tools
-    activities.ts          # 2 activity/event tools
+    projects.ts            # 4 project tools
+    activities.ts          # 3 activity/event tools
     emails.ts              # 2 email tools
-    documents.ts           # 2 document tools
-    relationships.ts       # 2 relationship tools (ownership/partnership)
-    lookups.ts             # 8 lookup/config tools
-    composites.ts          # 5 smart composite tools
-    admin.ts               # 5 admin tools (webhooks, export, favorites)
+    documents.ts           # 6 document tools
+    relationships.ts       # 5 relationship tools (ownership/partnership/favorites)
+    images.ts              # 5 image tools
+    links.ts               # 3 property link tools
+    portals.ts             # 2 portal export tools
+    lookups.ts             # 11 lookup/config tools
+    composites.ts          # 6 smart composite tools
+    admin.ts               # 4 admin tools (webhooks, favorites)
 ```
 
 ## License

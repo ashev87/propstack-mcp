@@ -440,7 +440,7 @@ Always fetches with new=1 (extra fields) and expand=1 (custom fields).`,
         // Append links
         if (property.links && property.links.length > 0) {
           const linkLines = property.links.map(
-            (l) => `  - ${fmt(l.title, "Link")}: ${fmt(l.url)}`,
+            (l) => `  - ${fmt(l.title, "Link")} (ID: ${l.id}): ${fmt(l.url)}`,
           );
           result += `\nLinks:\n${linkLines.join("\n")}`;
         }
@@ -645,6 +645,30 @@ Use this tool to look up valid status IDs before:
         return textResult(`Property statuses:\n\n${lines.join("\n")}`);
       } catch (err) {
         return errorResult("Property status", err);
+      }
+    },
+  );
+
+  // ── delete_property ──────────────────────────────────────────────
+
+  server.tool(
+    "delete_property",
+    `Delete a property (unit) from Propstack.
+
+This removes the listing together with its images, documents and links,
+and it disappears from portals. Always confirm with the user first, naming
+the property's title and ID. To take a listing offline but keep it, change
+its status with update_property or use publish_to_portals with active: false.`,
+    {
+      id: z.number()
+        .describe("Property ID to delete"),
+    },
+    async (args) => {
+      try {
+        await client.delete(`/units/${args.id}`);
+        return textResult(`Property ${args.id} deleted.`);
+      } catch (err) {
+        return errorResult("Property", err);
       }
     },
   );

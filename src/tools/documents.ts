@@ -118,6 +118,8 @@ Use the boolean flags to classify the document:
         .describe("Mark as exposé document"),
       on_landing_page: z.boolean().optional()
         .describe("Show on property landing page"),
+      tags: z.array(z.string()).optional()
+        .describe("Document tags, e.g. ['Energieausweis']; unknown tags are created"),
     },
     async (args) => {
       try {
@@ -129,6 +131,111 @@ Use the boolean flags to classify the document:
         return textResult(`Document uploaded successfully.\n\n${formatDocument(document)}`);
       } catch (err) {
         return errorResult("Document", err);
+      }
+    },
+  );
+
+  // ── get_document ────────────────────────────────────────────────
+
+  server.tool(
+    "get_document",
+    `Get a single document's details, including its download URL and flags.
+
+Download URLs are signed and may expire; fetch the document again rather
+than storing the URL.`,
+    {
+      id: z.number()
+        .describe("Document ID"),
+    },
+    async (args) => {
+      try {
+        const document = await client.get<PropstackDocument>(`/documents/${args.id}`);
+        return textResult(formatDocument(document));
+      } catch (err) {
+        return errorResult("Document", err);
+      }
+    },
+  );
+
+  // ── update_document ─────────────────────────────────────────────
+
+  server.tool(
+    "update_document",
+    `Update a document's title, tags or flags (floor plan, exposé, private,
+landing page). Only provide the fields you want to change.
+
+Setting tags replaces the document's tag list. To replace the file itself,
+upload a new document and delete the old one.`,
+    {
+      id: z.number()
+        .describe("Document ID"),
+      title: z.string().optional()
+        .describe("New title"),
+      tags: z.array(z.string()).optional()
+        .describe("New tag list (replaces existing tags; unknown tags are created)"),
+      is_private: z.boolean().optional()
+        .describe("Hide from portals"),
+      is_floorplan: z.boolean().optional()
+        .describe("Mark as floor plan (Grundriss)"),
+      is_exposee: z.boolean().optional()
+        .describe("Use as the PDF exposé of the property/project"),
+      on_landing_page: z.boolean().optional()
+        .describe("Show on the landing page"),
+    },
+    async (args) => {
+      try {
+        const { id, ...fields } = args;
+        const body = stripUndefined(fields);
+        if (Object.keys(body).length === 0) {
+          return { ...textResult("Nothing to update: provide at least one field."), isError: true as const };
+        }
+        const document = await client.put<PropstackDocument>(`/documents/${id}`, {
+          body: { document: body },
+        });
+        return textResult(`Document updated successfully.\n\n${formatDocument(document)}`);
+      } catch (err) {
+        return errorResult("Document", err);
+      }
+    },
+  );
+
+  // ── delete_document ─────────────────────────────────────────────
+
+  server.tool(
+    "delete_document",
+    `Permanently delete a document. This cannot be undone.
+
+Confirm with the user before deleting, naming the document's title.`,
+    {
+      id: z.number()
+        .describe("Document ID to delete"),
+    },
+    async (args) => {
+      try {
+        await client.delete(`/documents/${args.id}`);
+        return textResult(`Document ${args.id} deleted.`);
+      } catch (err) {
+        return errorResult("Document", err);
+      }
+    },
+  );
+
+  // ── list_document_tags ──────────────────────────────────────────
+
+  server.tool(
+    "list_document_tags",
+    `List all tags in use on documents (e.g. "Energieausweis", "Grundbuch").
+
+Use them with upload_document / update_document.`,
+    {},
+    async () => {
+      try {
+        const res = await client.get<{ data?: string[] } | string[]>("/documents/tags");
+        const tags = Array.isArray(res) ? res : (res.data ?? []);
+        if (tags.length === 0) return textResult("No document tags defined.");
+        return textResult(`Document tags (${tags.length}):\n\n${tags.map((t) => `- ${t}`).join("\n")}`);
+      } catch (err) {
+        return errorResult("Document tag", err);
       }
     },
   );

@@ -301,3 +301,41 @@ export function applyCustomFilters(
   }
   return out;
 }
+
+/** Named entities common in German email bodies (others are left as-is). */
+const NAMED_ENTITIES: Record<string, string> = {
+  auml: "ä", ouml: "ö", uuml: "ü", Auml: "Ä", Ouml: "Ö", Uuml: "Ü", szlig: "ß",
+  euro: "€", sect: "§", ndash: "–", mdash: "—", hellip: "…", bdquo: "„",
+  ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", laquo: "«", raquo: "»",
+  copy: "©", reg: "®", deg: "°", sup2: "²", sup3: "³", middot: "·", bull: "•",
+};
+
+/**
+ * Convert an HTML fragment (email or note body) to readable plain text.
+ * Keeps paragraph/line breaks and list bullets; drops tags, scripts, styles
+ * and HTML comments; decodes the common entities.
+ */
+export function htmlToText(html: string | null | undefined): string {
+  if (!html) return "";
+  const text = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<\/(p|div|h[1-6]|tr|blockquote|ul|ol)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&([a-zA-Z]+);/g, (m, name: string) => NAMED_ENTITIES[name] ?? m)
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, "&");
+  return text
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

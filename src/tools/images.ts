@@ -16,9 +16,16 @@ function formatImage(img: PropstackImage): string {
     (img.url ? `\n  ${img.url}` : "");
 }
 
+/** Image fields accepted only by the V2 PUT /images/{id} endpoint. */
+const V2_ONLY_IMAGE_FIELDS = ["is_floorplan", "is_not_for_exposee", "position"];
+
 // ── Tool registration ────────────────────────────────────────────────
 
-export function registerImageTools(server: McpServer, client: PropstackClient): void {
+export function registerImageTools(
+  server: McpServer,
+  client: PropstackClient,
+  clientV2: PropstackClient,
+): void {
   // ── list_property_images ────────────────────────────────────────
 
   server.tool(
@@ -26,7 +33,7 @@ export function registerImageTools(server: McpServer, client: PropstackClient): 
     `List all images and floor plans of a property, in portal order.
 
 Returns each image's ID, title, position, floorplan/private flags and URL.
-Use the IDs with update_image. Image URLs are signed and may expire after
+Use the IDs with update_image, sort_images and delete_image. Image URLs are signed and may expire after
 a while; fetch them again rather than storing them.`,
     {
       property_id: z.number()
@@ -132,10 +139,14 @@ e.g. "Wohnzimmer (virtuell möbliert)"; German law requires the label.`,
 
   server.tool(
     "update_image",
-    `Update an image's title or portal visibility.
+    `Update an image's title, portal visibility, floor-plan flag or position.
 
 Use list_property_images to find image IDs. Titles can be set per language
-with title_de / title_en. Only provide the fields you want to change.`,
+with title_de / title_en. Only provide the fields you want to change.
+
+is_floorplan moves the image between images and floor plans.
+is_not_for_exposee keeps the image out of generated exposés.
+To reorder several images at once, use sort_images instead of position.`,
     {
       id: z.number()
         .describe("Image ID"),
@@ -147,6 +158,12 @@ with title_de / title_en. Only provide the fields you want to change.`,
         .describe("English title"),
       is_private: z.boolean().optional()
         .describe("true = hide from portals, false = publish to portals"),
+      is_floorplan: z.boolean().optional()
+        .describe("true = this image is a floor plan (Grundriss)"),
+      is_not_for_exposee: z.boolean().optional()
+        .describe("true = leave this image out of exposés"),
+      position: z.number().int().min(1).optional()
+        .describe("New position in the image order (1 = first)"),
     },
     async (args) => {
       try {
@@ -155,8 +172,76 @@ with title_de / title_en. Only provide the fields you want to change.`,
         if (Object.keys(image).length === 0) {
           return { ...textResult("Nothing to update: provide at least one field."), isError: true as const };
         }
-        await client.put(`/images/${id}`, { body: { image } });
+        // V1 documents only title(_<locale>) and is_private. The other fields
+        // exist only on the V2 endpoint, which takes a flat (unwrapped) body.
+        const needsV2 = V2_ONLY_IMAGE_FIELDS.some((f) => f in image);
+        if (needsV2) {
+          await clientV2.put(`/images/${id}`, { body: image });
+        } else {
+          await client.put(`/images/${id}`, { body: { image } });
+        }
         return textResult(`Image ${id} updated (${Object.keys(image).join(", ")}).`);
+      } catch (err) {
+        return errorResult("Image", err);
+      }
+    },
+  );
+
+  // ── sort_images ─────────────────────────────────────────────────
+
+  server.tool(
+    "sort_images",
+    `Set the order of a property's or project's images (portal and exposé order).
+
+Pass image_ids in the desired order; the first becomes the title image.
+Get the IDs from list_property_images. Provide exactly one of property_id
+or project_id. Uses Propstack API V2.`,
+    {
+      image_ids: z.array(z.number()).min(1)
+        .describe("Image IDs in the new order (first = title image)"),
+      property_id: z.number().optional()
+        .describe("Property the images belong to"),
+      project_id: z.number().optional()
+        .describe("Project the images belong to"),
+    },
+    async (args) => {
+      try {
+        const targets = [args.property_id, args.project_id].filter((v) => v !== undefined);
+        if (targets.length !== 1) {
+          return { ...textResult("Provide exactly one of property_id or project_id."), isError: true as const };
+        }
+        await clientV2.put("/images/sort", {
+          body: stripUndefined({
+            item: args.image_ids,
+            property_id: args.property_id,
+            project_id: args.project_id,
+          }),
+        });
+        return textResult(
+          `Images reordered (${args.image_ids.length}). New title image: ${args.image_ids[0]}.`,
+        );
+      } catch (err) {
+        return errorResult("Image", err);
+      }
+    },
+  );
+
+  // ── delete_image ────────────────────────────────────────────────
+
+  server.tool(
+    "delete_image",
+    `Permanently delete an image or floor plan. This cannot be undone.
+
+Confirm with the user before deleting. To only hide an image from portals,
+use update_image with is_private: true instead. Uses Propstack API V2.`,
+    {
+      id: z.number()
+        .describe("Image ID to delete"),
+    },
+    async (args) => {
+      try {
+        await clientV2.delete(`/images/${args.id}`);
+        return textResult(`Image ${args.id} deleted.`);
       } catch (err) {
         return errorResult("Image", err);
       }
