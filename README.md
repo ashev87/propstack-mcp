@@ -361,6 +361,14 @@ src/
     admin.ts               # 5 admin tools (webhooks, export, favorites)
 ```
 
+## Maintainer & related / Betreuung und Weiterführendes
+
+Built and maintained by Andriy Shevchenko, [SmartProcess Lab](https://smartprocesslab.de/immobilien) (Berlin), a Propstack implementation partner. SmartProcess Lab sets up this server for brokerages and builds automations on top of it.
+
+- **Setup help / Einrichtung und Automatisierung:** [smartprocesslab.de/immobilien](https://smartprocesslab.de/immobilien)
+- **Which tools work with Propstack? / Welche Tools passen zu Propstack?** [MaklerStack](https://maklerstack.eu) is our German-language directory of AI and PropTech tools for real estate agents, with prices read from the vendors' pages: [Propstack profile](https://maklerstack.eu/tool/propstack), [Maklersoftware im Vergleich](https://maklerstack.eu/kategorie/crm).
+- **Official listing / Offizielle Erwähnung:** [Propstack documentation, MCP server](https://docs.propstack.de/integrationen/mcp-server)
+
 ## License
 
 MIT
