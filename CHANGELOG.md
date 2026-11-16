@@ -3,6 +3,30 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`delete_image`** — permanently deletes an image or floor plan. Destructive
+  and irreversible; the tool description says so (#13).
+- **`update_image`** can now set an image's `position` and mark it as a floor
+  plan with `is_floorplan` (#13).
+- **`list_inbound_emails`** — lists received emails, filterable by contact,
+  property, project and broker. Returns subject, date and linked IDs only; no
+  addresses, names or email text (#13).
+- **`get_email`** — reads one email by activity ID, with an optional `fields`
+  whitelist. The body is returned as plain text and capped in length (#13).
+- Optional **`PROPSTACK_API_KEY_V2`** environment variable.
+
+### Notes
+- `delete_image` and the `position` / `is_floorplan` options use the Propstack
+  **API V2 (beta)**, because the V1 API does not document them. They use
+  `PROPSTACK_API_KEY_V2` if set and `PROPSTACK_API_KEY` otherwise. All other
+  tools, including title and visibility updates in `update_image`, stay on V1.
+- Emails are read through the documented V1 activity endpoints
+  (`GET /activities?item_type=message`, `GET /activities/:id`). Propstack
+  documents no inbound-only filter, so `list_inbound_emails` drops sent emails
+  after fetching each page; a page can hold fewer results than requested.
+
 ## [1.2.0] — 2026-10-15
 
 ### Added
