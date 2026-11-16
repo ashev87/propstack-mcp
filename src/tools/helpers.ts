@@ -227,6 +227,13 @@ export const DEAL_FIELDS = [
   "deal_stage", "deal_pipeline", "created_at", "updated_at",
 ] as const;
 
+/** Attributes of the email object as documented in the Propstack V1 API. */
+export const EMAIL_FIELDS = [
+  "id", "subject", "body", "broker_id", "from", "to", "cc", "bcc",
+  "client_ids", "property_ids", "project_ids", "message_attachment_ids",
+  "client_source_id", "message_category_id",
+] as const;
+
 /**
  * Validate a requested `fields` list against a known field set. Returns a
  * clear, user-facing error message if any field is unknown, or null if all

@@ -1,6 +1,8 @@
 export type { PropstackPaginatedResponse } from "./types/propstack.js";
 
 const V1_BASE = "https://api.propstack.de/v1";
+/** Propstack API V2 (beta). Same auth header and key as V1. */
+export const V2_BASE = "https://api.propstack.de/v2";
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;

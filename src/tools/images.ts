@@ -4,6 +4,12 @@ import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackImage, PropstackProperty } from "../types/propstack.js";
 import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
 
+const toolError = (text: string) => ({ ...textResult(text), isError: true as const });
+
+const NO_V2_CLIENT =
+  "This operation needs the Propstack API V2, which is not configured on this server.";
+
+
 // ── Response formatting ──────────────────────────────────────────────
 
 function formatImage(img: PropstackImage): string {
@@ -18,7 +24,17 @@ function formatImage(img: PropstackImage): string {
 
 // ── Tool registration ────────────────────────────────────────────────
 
-export function registerImageTools(server: McpServer, client: PropstackClient): void {
+/**
+ * @param client   V1 client (list, upload, title / visibility updates)
+ * @param v2Client V2 client. The public V1 API documents neither deleting an
+ *                 image nor its `position` / `is_floorplan` fields; the V2
+ *                 (beta) API does, so those operations go through V2.
+ */
+export function registerImageTools(
+  server: McpServer,
+  client: PropstackClient,
+  v2Client?: PropstackClient,
+): void {
   // ── list_property_images ────────────────────────────────────────
 
   server.tool(
@@ -26,7 +42,7 @@ export function registerImageTools(server: McpServer, client: PropstackClient): 
     `List all images and floor plans of a property, in portal order.
 
 Returns each image's ID, title, position, floorplan/private flags and URL.
-Use the IDs with update_image. Image URLs are signed and may expire after
+Use the IDs with update_image and delete_image. Image URLs are signed and may expire after
 a while; fetch them again rather than storing them.`,
     {
       property_id: z.number()
@@ -132,10 +148,17 @@ e.g. "Wohnzimmer (virtuell möbliert)"; German law requires the label.`,
 
   server.tool(
     "update_image",
-    `Update an image's title or portal visibility.
+    `Update an image's title, portal visibility, position or floor-plan flag.
 
 Use list_property_images to find image IDs. Titles can be set per language
-with title_de / title_en. Only provide the fields you want to change.`,
+with title_de / title_en. Only provide the fields you want to change.
+
+position sets the image's place in the property's image order (as shown by
+list_property_images). is_floorplan marks the image as a floor plan
+(Grundriss) or turns it back into a regular image.
+
+position and is_floorplan are only available through the Propstack API V2
+(beta). When either is given, the whole update is sent to V2.`,
     {
       id: z.number()
         .describe("Image ID"),
@@ -147,16 +170,66 @@ with title_de / title_en. Only provide the fields you want to change.`,
         .describe("English title"),
       is_private: z.boolean().optional()
         .describe("true = hide from portals, false = publish to portals"),
+      position: z.number().int().optional()
+        .describe("Position in the image order (API V2)"),
+      is_floorplan: z.boolean().optional()
+        .describe("true = mark as floor plan (Grundriss), false = regular image (API V2)"),
     },
     async (args) => {
-      try {
-        const { id, ...fields } = args;
-        const image = stripUndefined(fields);
-        if (Object.keys(image).length === 0) {
-          return { ...textResult("Nothing to update: provide at least one field."), isError: true as const };
+      const { id, ...fields } = args;
+      const image = stripUndefined(fields);
+      if (Object.keys(image).length === 0) {
+        return toolError("Nothing to update: provide at least one field.");
+      }
+      const summary = `Image ${id} updated (${Object.keys(image).join(", ")}).`;
+
+      // position / is_floorplan exist only in the V2 API. V2 also accepts the
+      // title and visibility fields, so send everything in one call there
+      // instead of splitting the update across two APIs.
+      if (image.position !== undefined || image.is_floorplan !== undefined) {
+        if (!v2Client) return toolError(NO_V2_CLIENT);
+        try {
+          // V2 takes the fields at the top level (no `image` wrapper).
+          await v2Client.put(`/images/${id}`, { body: image });
+          return textResult(summary);
+        } catch (err) {
+          return errorResult("Image", err);
         }
+      }
+
+      try {
         await client.put(`/images/${id}`, { body: { image } });
-        return textResult(`Image ${id} updated (${Object.keys(image).join(", ")}).`);
+        return textResult(summary);
+      } catch (err) {
+        return errorResult("Image", err);
+      }
+    },
+  );
+
+  // ── delete_image ────────────────────────────────────────────────
+
+  server.tool(
+    "delete_image",
+    `DESTRUCTIVE: permanently delete an image or floor plan from Propstack.
+
+This cannot be undone. The image file is removed from the property or
+project and from the portal export; there is no trash and no restore. To
+only hide an image from portals, use update_image with is_private: true
+instead.
+
+Before calling, confirm the exact image with the user (use
+list_property_images to show its ID and title). Deletes one image per call.
+
+Uses the Propstack API V2 (beta).`,
+    {
+      id: z.number()
+        .describe("ID of the image to delete permanently"),
+    },
+    async (args) => {
+      if (!v2Client) return toolError(NO_V2_CLIENT);
+      try {
+        await v2Client.delete(`/images/${args.id}`);
+        return textResult(`Image ${args.id} permanently deleted.`);
       } catch (err) {
         return errorResult("Image", err);
       }

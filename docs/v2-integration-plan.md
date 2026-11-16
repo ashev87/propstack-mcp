@@ -3,7 +3,7 @@
 Status: **draft / planning**. Researched against the live V2 OpenAPI spec
 (`https://api.propstack.de/v2/swagger_doc`) on 2026-06-30. V2 is officially
 **Beta** (`info.version: "0.1"`, title "Propstack API v2 Beta"), so treat the
-surface below as subject to change and verify against a real V2 key before
+surface below as subject to change and verify against the live API before
 building.
 
 ---
@@ -13,8 +13,8 @@ building.
 - **Base URL:** `https://api.propstack.de/v2`
 - **Auth:** `X-Api-Key` header (API-key security scheme). Our V1 client already
   sends `X-API-KEY`; HTTP headers are case-insensitive so the same mechanism
-  works, but Propstack supports **separate V1/V2 keys**, so we expose a distinct
-  `PROPSTACK_API_KEY_V2` (falling back to the V1 key).
+  works. **The same API key is used for V1 and V2**, so V2 calls use
+  `PROPSTACK_API_KEY`; there is no separate V2 key or environment variable.
 - **55 paths total.** The relevant ones:
 
 ### Scroll endpoints (the whole reason to use V2) — 4 of them
@@ -84,10 +84,9 @@ If a tool would dump rows, it doesn't ship.
 - `async *scrollAll(endpoint, params)` generator that loops `scroll_id` until
   `data` is empty, yielding records (or pages). Caller aggregates; nothing is
   buffered wholesale beyond what a tool needs.
-- Config: `PROPSTACK_API_KEY_V2` env (fallback to `PROPSTACK_API_KEY`).
-- **Graceful disable:** if no key works against V2, the V2 tools are not
-  registered (or return a clear "V2 not configured" message) so the V1 server
-  is unaffected.
+- Config: none beyond `PROPSTACK_API_KEY`, which V2 accepts as well.
+- **Failure isolation:** V2 errors surface as tool errors on the V2-backed
+  tools only, so the V1 tools are unaffected.
 
 ---
 
@@ -125,16 +124,15 @@ If a tool would dump rows, it doesn't ship.
 ## 5. Risks / open questions (resolve in Step 0)
 
 - **Beta surface (v0.1)** — schemas/fields may shift; pin to what we verify.
-- **Key compatibility** — confirm whether the V1 key works against V2 or a
-  dedicated V2 key is required (test the 401 endpoints with a real key).
+- **Key compatibility** — resolved: the same key works for V1 and V2.
 - **`fields` transport** — confirm query vs formData on the GET scroll routes.
 - **Scroll termination** — confirm "empty `data`" is the stop signal (vs. a
   stable/empty `scroll_id`).
 - **Rate limits** — full scans = many calls; reuse V1 backoff and cap with a
   `with_total`-driven progress + a sane hard ceiling per tool.
 
-## 6. Step 0 — verification spike (needs a real V2 key)
-1. Generate a V2 key in Propstack admin; confirm `GET /v2/properties/scroll?per=1`
+## 6. Step 0 — verification spike (needs a real API key)
+1. With the existing Propstack API key, confirm `GET /v2/properties/scroll?per=1`
    returns `{ data, scroll_id }` with `X-Api-Key`.
 2. Confirm the `fields` whitelist behavior and the scroll loop over 2-3 pages.
 3. Hit one `/history/...` and `/clients/deleted` to confirm shape.

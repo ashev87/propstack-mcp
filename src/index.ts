@@ -4,7 +4,7 @@ import "dotenv/config";
 import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { PropstackClient } from "./propstack-client.js";
+import { PropstackClient, V2_BASE } from "./propstack-client.js";
 
 // Single source of truth for the version advertised to MCP clients.
 const require = createRequire(import.meta.url);
@@ -41,6 +41,10 @@ if (!PROPSTACK_API_KEY) {
 
 const client = new PropstackClient(PROPSTACK_API_KEY);
 
+// A few operations (deleting images, image position / floor-plan flag) are
+// only documented in the Propstack API V2 (beta). V2 accepts the same key.
+const v2Client = new PropstackClient(PROPSTACK_API_KEY, V2_BASE);
+
 const server = new McpServer(
   {
     name: "propstack-mcp-server",
@@ -62,7 +66,7 @@ registerProjectTools(server, client);
 registerActivityTools(server, client);
 registerEmailTools(server, client);
 registerDocumentTools(server, client);
-registerImageTools(server, client);
+registerImageTools(server, client, v2Client);
 registerRelationshipTools(server, client);
 registerLookupTools(server, client);
 registerCompositeTools(server, client);

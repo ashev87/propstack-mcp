@@ -132,7 +132,9 @@ Get your Propstack API key:
 
 > **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
 
-## Available Tools (56)
+`delete_image` and the `position` / `is_floorplan` options of `update_image` use the Propstack **API V2 (beta)**, because the V1 API does not document these operations. V2 accepts the same API key; all other tools use V1.
+
+## Available Tools (59)
 
 ### Contacts (Kontakte)
 
@@ -201,6 +203,8 @@ Get your Propstack API key:
 |---|---|
 | `send_email` | Send email using a Propstack template (snippet) |
 | `update_email` | Mark read/archived, categorize, link to CRM records |
+| `list_inbound_emails` | List received emails by contact, property, project or broker (subject, date and linked IDs only) |
+| `get_email` | Read one email by activity ID; optional `fields` whitelist, body as plain text |
 
 ### Documents (Dokumente)
 
@@ -215,7 +219,8 @@ Get your Propstack API key:
 |---|---|
 | `list_property_images` | List a property's images and floor plans in portal order (IDs, titles, flags) |
 | `upload_image` | Upload an image to a property or project (base64 data URI, portal visibility) |
-| `update_image` | Change an image's title (incl. `title_de` / `title_en`) or portal visibility |
+| `update_image` | Change an image's title (incl. `title_de` / `title_en`), portal visibility, position or floor-plan flag (position / floor plan: API V2) |
+| `delete_image` | **Destructive:** permanently delete an image or floor plan; cannot be undone (API V2) |
 
 ### Relationships (Beziehungen)
 
@@ -320,7 +325,9 @@ Das Tool `match_contacts_to_property` erzeugt einen Uebereinstimmungs-Score (Ran
 
 ### Datenminimierung (`fields`-Parameter)
 
-Die Tools, die personenbezogene Daten in groesserem Umfang zurueckgeben — `search_contacts`, `search_properties`, `search_deals` und `full_contact_360` — unterstuetzen einen optionalen `fields`-Parameter. Damit lassen sich gezielt nur die benoetigten Felder abrufen (z. B. `["first_name", "last_name", "email"]`). Ohne `fields` bleibt das Verhalten unveraendert (alle Felder werden zurueckgegeben). Es wird empfohlen, dass Verantwortliche `fields` nutzen, um nur die fuer den jeweiligen Zweck erforderlichen Daten zu verarbeiten — im Sinne von **Datenschutz durch Technikgestaltung** (Art. 25 DSGVO).
+Die Tools, die personenbezogene Daten in groesserem Umfang zurueckgeben — `search_contacts`, `search_properties`, `search_deals`, `full_contact_360` und `get_email` — unterstuetzen einen optionalen `fields`-Parameter. Damit lassen sich gezielt nur die benoetigten Felder abrufen (z. B. `["first_name", "last_name", "email"]`). Ohne `fields` bleibt das Verhalten unveraendert (alle Felder werden zurueckgegeben). Es wird empfohlen, dass Verantwortliche `fields` nutzen, um nur die fuer den jeweiligen Zweck erforderlichen Daten zu verarbeiten — im Sinne von **Datenschutz durch Technikgestaltung** (Art. 25 DSGVO).
+
+`list_inbound_emails` gibt grundsaetzlich nur Betreff, Datum und verknuepfte IDs zurueck — keine Absenderadressen, keine Namen und keinen E-Mail-Text. Der Inhalt einer einzelnen E-Mail wird erst mit `get_email` abgerufen.
 
 ### Audit-Logging / Zugriffskontrolle
 
@@ -353,7 +360,7 @@ src/
     search-profiles.ts     # 4 search profile tools
     projects.ts            # 2 project tools
     activities.ts          # 2 activity/event tools
-    emails.ts              # 2 email tools
+    emails.ts              # 4 email tools
     documents.ts           # 2 document tools
     relationships.ts       # 2 relationship tools (ownership/partnership)
     lookups.ts             # 8 lookup/config tools
