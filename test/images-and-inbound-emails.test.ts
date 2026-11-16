@@ -62,13 +62,6 @@ describe("delete_image", () => {
     expect(res.content[0].text).toContain("Image not found");
   });
 
-  it("points at the V2 key when V2 rejects the key", async () => {
-    const unauthorized = vi.fn().mockRejectedValue(new PropstackError(401, "Unauthorized", "", "/images/5"));
-    const res = await imageHarness({}, { delete: unauthorized }).call("delete_image", { id: 5 });
-    expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain("PROPSTACK_API_KEY_V2");
-  });
-
   it("fails cleanly when no V2 client is configured", async () => {
     const res = await imageHarness({}).call("delete_image", { id: 5 });
     expect(res.isError).toBe(true);

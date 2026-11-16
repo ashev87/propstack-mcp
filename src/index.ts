@@ -42,11 +42,8 @@ if (!PROPSTACK_API_KEY) {
 const client = new PropstackClient(PROPSTACK_API_KEY);
 
 // A few operations (deleting images, image position / floor-plan flag) are
-// only documented in the Propstack API V2 (beta). Propstack can issue
-// separate V1 and V2 keys, so an optional dedicated key is supported; without
-// it the V1 key is used.
-const PROPSTACK_API_KEY_V2 = process.env["PROPSTACK_API_KEY_V2"] || PROPSTACK_API_KEY;
-const v2Client = new PropstackClient(PROPSTACK_API_KEY_V2, V2_BASE);
+// only documented in the Propstack API V2 (beta). V2 accepts the same key.
+const v2Client = new PropstackClient(PROPSTACK_API_KEY, V2_BASE);
 
 const server = new McpServer(
   {

@@ -132,9 +132,7 @@ Get your Propstack API key:
 
 > **Hinweis:** Der API-Schluessel bestimmt die Berechtigungen. Stellen Sie sicher, dass Lese- und Schreibzugriff fuer die benoetigten Endpunkte aktiviert ist.
 
-### Optional: V2 API key
-
-`delete_image` and the `position` / `is_floorplan` options of `update_image` use the Propstack **API V2 (beta)**, because the V1 API does not document these operations. All other tools use V1. If your V1 key is not accepted by V2, create a V2 key and set it as `PROPSTACK_API_KEY_V2`; without it the server uses `PROPSTACK_API_KEY` for V2 as well.
+`delete_image` and the `position` / `is_floorplan` options of `update_image` use the Propstack **API V2 (beta)**, because the V1 API does not document these operations. V2 accepts the same API key; all other tools use V1.
 
 ## Available Tools (59)
 

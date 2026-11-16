@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PropstackClient } from "../propstack-client.js";
 import type { PropstackImage, PropstackProperty } from "../types/propstack.js";
-import { PropstackError } from "../propstack-client.js";
 import { textResult, errorResult, fmt, stripUndefined } from "./helpers.js";
 
 const toolError = (text: string) => ({ ...textResult(text), isError: true as const });
@@ -10,22 +9,6 @@ const toolError = (text: string) => ({ ...textResult(text), isError: true as con
 const NO_V2_CLIENT =
   "This operation needs the Propstack API V2, which is not configured on this server.";
 
-/**
- * Error result for calls against the Propstack API V2 (beta). Same handling
- * as errorResult, except that key problems point at the V2 key: Propstack can
- * issue separate V1 and V2 keys, so a working V1 key may still be rejected.
- */
-function v2ErrorResult(err: unknown) {
-  if (err instanceof PropstackError && (err.status === 401 || err.status === 403)) {
-    return toolError(
-      "The Propstack API V2 rejected the API key. Deleting images and setting " +
-      "position / is_floorplan use the V2 API (beta). Set PROPSTACK_API_KEY_V2 " +
-      "to a V2 key (falls back to PROPSTACK_API_KEY) and check its permissions " +
-      "at crm.propstack.de/app/admin/api_keys",
-    );
-  }
-  return errorResult("Image", err);
-}
 
 // ── Response formatting ──────────────────────────────────────────────
 
@@ -175,8 +158,7 @@ list_property_images). is_floorplan marks the image as a floor plan
 (Grundriss) or turns it back into a regular image.
 
 position and is_floorplan are only available through the Propstack API V2
-(beta). When either is given, the whole update is sent to V2, which may need
-its own key (PROPSTACK_API_KEY_V2, falls back to PROPSTACK_API_KEY).`,
+(beta). When either is given, the whole update is sent to V2.`,
     {
       id: z.number()
         .describe("Image ID"),
@@ -211,7 +193,7 @@ its own key (PROPSTACK_API_KEY_V2, falls back to PROPSTACK_API_KEY).`,
           await v2Client.put(`/images/${id}`, { body: image });
           return textResult(summary);
         } catch (err) {
-          return v2ErrorResult(err);
+          return errorResult("Image", err);
         }
       }
 
@@ -238,8 +220,7 @@ instead.
 Before calling, confirm the exact image with the user (use
 list_property_images to show its ID and title). Deletes one image per call.
 
-Uses the Propstack API V2 (beta), which may need its own key
-(PROPSTACK_API_KEY_V2, falls back to PROPSTACK_API_KEY).`,
+Uses the Propstack API V2 (beta).`,
     {
       id: z.number()
         .describe("ID of the image to delete permanently"),
@@ -250,7 +231,7 @@ Uses the Propstack API V2 (beta), which may need its own key
         await v2Client.delete(`/images/${args.id}`);
         return textResult(`Image ${args.id} permanently deleted.`);
       } catch (err) {
-        return v2ErrorResult(err);
+        return errorResult("Image", err);
       }
     },
   );

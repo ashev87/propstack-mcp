@@ -15,12 +15,11 @@ All notable changes to this project are documented here. This project follows
   addresses, names or email text (#13).
 - **`get_email`** — reads one email by activity ID, with an optional `fields`
   whitelist. The body is returned as plain text and capped in length (#13).
-- Optional **`PROPSTACK_API_KEY_V2`** environment variable.
 
 ### Notes
 - `delete_image` and the `position` / `is_floorplan` options use the Propstack
-  **API V2 (beta)**, because the V1 API does not document them. They use
-  `PROPSTACK_API_KEY_V2` if set and `PROPSTACK_API_KEY` otherwise. All other
+  **API V2 (beta)**, because the V1 API does not document them. V2 accepts
+  the same API key. All other
   tools, including title and visibility updates in `update_image`, stay on V1.
 - Emails are read through the documented V1 activity endpoints
   (`GET /activities?item_type=message`, `GET /activities/:id`). Propstack
